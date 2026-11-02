@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Admin Panel - Login</title>
+  <style>
+    body { font-family: Arial, sans-serif; background: #f0f2f5; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+    .box { background: white; padding: 30px; border-radius: 8px; width: 280px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
+    input { width: 100%; padding: 8px; margin: 8px 0; box-sizing: border-box; }
+    button { width: 100%; padding: 10px; background: #2d6cdf; color: white; border: none; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <div class="box">
+    <h3>Admin Panel</h3>
+    <form method="POST" action="/login">
+      <input type="text" name="username" placeholder="Username">
+      <input type="password" name="password" placeholder="Password">
+      <button type="submit">Log in</button>
+    </form>
+  </div>
+</body>
+</html>
