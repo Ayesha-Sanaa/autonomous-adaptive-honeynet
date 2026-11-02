@@ -29,3 +29,15 @@ services:
     depends_on:
       - backend
     restart: unless-stopped
+
+  heralding:
+    image: dtagdevsec/heralding:24.04.1
+    container_name: heralding
+    ports:
+      - "2121:21"
+      - "2323:23"
+    tmpfs:
+      - /tmp/heralding:uid=2000,gid=2000 
+    volumes:
+      - ./logs/heralding:/var/log/heralding     
+    restart: unless-stopped
