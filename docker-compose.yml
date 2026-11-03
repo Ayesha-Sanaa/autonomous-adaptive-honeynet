@@ -41,3 +41,14 @@ services:
     volumes:
       - ./logs/heralding:/var/log/heralding     
     restart: unless-stopped
+
+  dionaea:
+    image: dinotools/dionaea:nightly
+    container_name: dionaea
+    ports:
+      - "4445:445"
+    volumes:
+      - ./dionaea/etc:/opt/dionaea/etc
+      - ./dionaea/lib:/opt/dionaea/var/lib
+      - ./dionaea/log:/opt/dionaea/var/log
+    restart: unless-stopped    
