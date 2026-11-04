@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  namespace: honeynet
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      containers:
+        - name: backend
+          image: node:alpine
+          command: ["node", "/app/server.js"]
+          volumeMounts:
+            - name: code
+              mountPath: /app
+              readOnly: true
+            - name: logs
+              mountPath: /logs
+      volumes:
+        - name: code
+          configMap:
+            name: backend-code
+        - name: logs
+          hostPath:
+            path: /logs
+            type: Directory
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend
+  namespace: honeynet
+spec:
+  selector:
+    app: backend
+  ports:
+    - port: 3000
+      targetPort: 3000

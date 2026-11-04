@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web-portal
+  namespace: honeynet
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: web-portal
+  template:
+    metadata:
+      labels:
+        app: web-portal
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:alpine
+          ports:
+            - containerPort: 80
+          volumeMounts:
+            - name: html
+              mountPath: /usr/share/nginx/html
+              readOnly: true
+            - name: nginx-conf
+              mountPath: /etc/nginx/conf.d
+              readOnly: true
+      volumes:
+        - name: html
+          configMap:
+            name: portal-html
+        - name: nginx-conf
+          configMap:
+            name: nginx-conf
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: web-portal
+  namespace: honeynet
+spec:
+  type: NodePort
+  selector:
+    app: web-portal
+  ports:
+    - port: 80
+      targetPort: 80
+      nodePort: 30080

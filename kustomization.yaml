@@ -1,0 +1,19 @@
+resources:
+  - k8s/decoys/00-namespace.yaml
+  - k8s/decoys/cowrie.yaml
+  - k8s/decoys/backend.yaml
+  - k8s/decoys/web-portal.yaml
+
+configMapGenerator:
+  - name: backend-code
+    namespace: honeynet
+    files:
+      - backend/server.js
+  - name: portal-html
+    namespace: honeynet
+    files:
+      - portal/index.html
+  - name: nginx-conf
+    namespace: honeynet
+    files:
+      - nginx/default.conf
