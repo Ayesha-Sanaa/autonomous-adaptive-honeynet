@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cowrie
+  namespace: honeynet
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cowrie
+  template:
+    metadata:
+      labels:
+        app: cowrie
+    spec:
+      containers:
+        - name: cowrie
+          image: cowrie/cowrie:latest
+          ports:
+            - containerPort: 2222
+          volumeMounts:
+            - name: logs
+              mountPath: /cowrie/cowrie-git/var/log/cowrie
+      volumes:
+        - name: logs
+          hostPath:
+            path: /logs
+            type: Directory
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cowrie
+  namespace: honeynet
+spec:
+  type: NodePort
+  selector:
+    app: cowrie
+  ports:
+    - port: 2222
+      targetPort: 2222
+      nodePort: 30222
