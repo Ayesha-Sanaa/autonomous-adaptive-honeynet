@@ -1,0 +1,57 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dionaea
+  namespace: honeynet
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dionaea
+  template:
+    metadata:
+      labels:
+        app: dionaea
+    spec:
+      containers:
+        - name: dionaea
+          image: dinotools/dionaea:nightly
+          env:
+            - name: DIONAEA_FORCE_INIT_CONF
+              value: "1"
+          ports:
+            - containerPort: 445
+          volumeMounts:
+            - name: log-json
+              mountPath: /opt/dionaea/etc/dionaea/ihandlers-enabled/log_json.yaml
+              subPath: log_json.yaml
+            - name: lib
+              mountPath: /opt/dionaea/var/lib
+            - name: log
+              mountPath: /opt/dionaea/var/log
+      volumes:
+        - name: log-json
+          configMap:
+            name: dionaea-log-json
+        - name: lib
+          hostPath:
+            path: /logs/dionaea/lib
+            type: Directory
+        - name: log
+          hostPath:
+            path: /logs/dionaea/log
+            type: Directory
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dionaea
+  namespace: honeynet
+spec:
+  type: NodePort
+  selector:
+    app: dionaea
+  ports:
+    - port: 445
+      targetPort: 445
+      nodePort: 30445

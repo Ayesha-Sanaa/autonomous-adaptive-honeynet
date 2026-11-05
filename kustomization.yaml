@@ -4,7 +4,7 @@ resources:
   - k8s/decoys/backend.yaml
   - k8s/decoys/web-portal.yaml
   - k8s/decoys/heralding.yaml
-
+  - k8s/decoys/dionaea.yaml
 configMapGenerator:
   - name: backend-code
     namespace: honeynet
@@ -18,3 +18,8 @@ configMapGenerator:
     namespace: honeynet
     files:
       - nginx/default.conf
+
+  - name: dionaea-log-json
+    namespace: honeynet
+    files:
+      - dionaea/log_json.yaml   
