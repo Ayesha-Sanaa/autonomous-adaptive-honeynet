@@ -3,6 +3,7 @@ resources:
   - k8s/decoys/cowrie.yaml
   - k8s/decoys/backend.yaml
   - k8s/decoys/web-portal.yaml
+  - k8s/decoys/heralding.yaml
 
 configMapGenerator:
   - name: backend-code
