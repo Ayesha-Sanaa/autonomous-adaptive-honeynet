@@ -14,7 +14,7 @@ services:
     working_dir: /app
     command: node server.js
     volumes:
-      - ./backend:/app:ro
+      - ./decoys/web-portal/capture:/app:ro
       - ./logs:/logs
     restart: unless-stopped
 
@@ -24,8 +24,8 @@ services:
     ports:
       - "8080:80"
     volumes:
-      - ./portal:/usr/share/nginx/html:ro
-      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./decoys/web-portal/site:/usr/share/nginx/html:ro
+      - ./decoys/web-portal/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
     depends_on:
       - backend
     restart: unless-stopped

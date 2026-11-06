@@ -9,17 +9,17 @@ configMapGenerator:
   - name: backend-code
     namespace: honeynet
     files:
-      - backend/server.js
+     - decoys/web-portal/capture/server.js
   - name: portal-html
     namespace: honeynet
     files:
-      - portal/index.html
+     - decoys/web-portal/site/index.html
   - name: nginx-conf
     namespace: honeynet
     files:
-      - nginx/default.conf
+     - decoys/web-portal/nginx/default.conf
 
   - name: dionaea-log-json
     namespace: honeynet
     files:
-      - dionaea/log_json.yaml   
+     - decoys/dionaea/log_json.yaml   
