@@ -7,6 +7,7 @@ resources:
   - decoys/dionaea/dionaea.yaml
   - backend/deploy/mongodb.yaml
   - backend/deploy/collector.yaml
+  - backend/deploy/api.yaml
 configMapGenerator:
   - name: backend-code
     namespace: honeynet
