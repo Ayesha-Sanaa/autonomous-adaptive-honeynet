@@ -1,10 +1,10 @@
 resources:
-  - k8s/decoys/00-namespace.yaml
-  - k8s/decoys/cowrie.yaml
-  - k8s/decoys/backend.yaml
-  - k8s/decoys/web-portal.yaml
-  - k8s/decoys/heralding.yaml
-  - k8s/decoys/dionaea.yaml
+  - k8s/namespace.yaml
+  - decoys/cowrie/cowrie.yaml
+  - decoys/web-portal/capture.yaml
+  - decoys/web-portal/web-portal.yaml
+  - decoys/heralding/heralding.yaml
+  - decoys/dionaea/dionaea.yaml
 configMapGenerator:
   - name: backend-code
     namespace: honeynet
