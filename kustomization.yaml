@@ -5,6 +5,7 @@ resources:
   - decoys/web-portal/web-portal.yaml
   - decoys/heralding/heralding.yaml
   - decoys/dionaea/dionaea.yaml
+  - backend/mongodb.yaml
 configMapGenerator:
   - name: backend-code
     namespace: honeynet

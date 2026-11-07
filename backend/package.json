@@ -1,0 +1,7 @@
+{
+  "name": "honeynet-backend",
+  "private": true,
+  "dependencies": {
+    "mongodb": "^6.0.0"
+  }
+}
