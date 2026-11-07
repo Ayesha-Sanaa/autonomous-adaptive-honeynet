@@ -1,5 +1,2 @@
 logs/*
 !logs/.gitkeep
-dionaea/lib/
-dionaea/log/
-dionaea/etc/
