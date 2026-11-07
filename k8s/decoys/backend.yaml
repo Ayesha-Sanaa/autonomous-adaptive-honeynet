@@ -29,7 +29,7 @@ spec:
             name: backend-code
         - name: logs
           hostPath:
-            path: /logs
+            path: /logs/web-portal
             type: Directory
 ---
 apiVersion: v1

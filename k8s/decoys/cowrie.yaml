@@ -24,7 +24,7 @@ spec:
       volumes:
         - name: logs
           hostPath:
-            path: /logs
+            path: /logs/cowrie
             type: Directory
 ---
 apiVersion: v1

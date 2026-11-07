@@ -5,7 +5,7 @@ services:
     ports:
       - "2222:2222"
     volumes:
-      - ./logs:/cowrie/cowrie-git/var/log/cowrie
+      - ./logs/cowrie:/cowrie/cowrie-git/var/log/cowrie
     restart: unless-stopped
 
   backend:
@@ -15,7 +15,7 @@ services:
     command: node server.js
     volumes:
       - ./decoys/web-portal/capture:/app:ro
-      - ./logs:/logs
+      - ./logs/web-portal:/logs
     restart: unless-stopped
 
   web-portal:
@@ -37,9 +37,9 @@ services:
       - "2121:21"
       - "2323:23"
     tmpfs:
-      - /tmp/heralding:uid=2000,gid=2000 
+      - /tmp/heralding:uid=2000,gid=2000
     volumes:
-      - ./logs/heralding:/var/log/heralding     
+      - ./logs/heralding:/var/log/heralding
     restart: unless-stopped
 
   dionaea:
@@ -48,7 +48,7 @@ services:
     ports:
       - "4445:445"
     volumes:
-      - ./dionaea/etc:/opt/dionaea/etc
-      - ./dionaea/lib:/opt/dionaea/var/lib
-      - ./dionaea/log:/opt/dionaea/var/log
-    restart: unless-stopped    
+      - ./logs/dionaea/etc:/opt/dionaea/etc
+      - ./logs/dionaea/lib:/opt/dionaea/var/lib
+      - ./logs/dionaea/log:/opt/dionaea/var/log
+    restart: unless-stopped
