@@ -1,0 +1,32 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: collector
+  namespace: honeynet
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: collector
+  template:
+    metadata:
+      labels:
+        app: collector
+    spec:
+      containers:
+        - name: collector
+          image: honeynet-backend:dev
+          imagePullPolicy: Never
+          command: ["node", "collector.js"]
+          env:
+            - name: MONGO_URL
+              value: mongodb://mongodb:27017
+          volumeMounts:
+            - name: logs
+              mountPath: /logs
+              readOnly: true
+      volumes:
+        - name: logs
+          hostPath:
+            path: /logs
+            type: Directory
