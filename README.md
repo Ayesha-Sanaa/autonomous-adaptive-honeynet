@@ -85,7 +85,7 @@ The Compose path does not enable Dionaea's JSON log; the Kubernetes path does.
 - Source IPs in the logs are the cluster gateway when testing from the same laptop.
   On a real server they would be the attacker's address.
 
-## Roadmap
+## Roadmap phases
 
 1. Single SSH decoy with logs (done)
 2. More decoys: web portal, Heralding, Dionaea (done)
