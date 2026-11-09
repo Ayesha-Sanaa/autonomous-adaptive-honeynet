@@ -1,4 +1,5 @@
 const fs = require("fs");
+const { mapAttack } = require("./mitre");
 const crypto = require("crypto");
 const { MongoClient } = require("mongodb");
 const { parseCsvLine } = require("./records");
@@ -49,6 +50,7 @@ async function poll(src, events) {
       if (!rec) continue;
       const n = src.normalize(rec);
       if (!n) continue;
+      n.attack = mapAttack(n);
       const _id = crypto.createHash("sha1").update(`${src.decoy}\n${line}`).digest("hex");
       docs.push({ _id, ...n, timestamp: new Date(n.timestamp) });
     } catch {
@@ -56,14 +58,11 @@ async function poll(src, events) {
     }
   }
   if (docs.length > 0) {
-    try {
-      await events.insertMany(docs, { ordered: false });
-    } catch (err) {
-      const errors = [].concat(err.writeErrors ?? []);
-      const onlyDuplicates = errors.length > 0 && errors.every((w) => w.code === 11000);
-      if (!onlyDuplicates) throw err;
-    }
-  }
+  await events.bulkWrite(
+    docs.map(({ _id, ...d }) => ({ updateOne: { filter: { _id }, update: { $set: d }, upsert: true } })),
+    { ordered: false }
+  );
+}
   console.log(`${src.decoy}: ${docs.length} events processed, ${bad} unparseable`);
 }
 
