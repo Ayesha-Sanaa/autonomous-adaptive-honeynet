@@ -19,31 +19,28 @@ const TACTICS = {
   "impact":               { id: "TA0040", name: "Impact" },
 };
 
+// Only techniques that a rule below can actually produce.
 const TECHNIQUES = {
-  "T1078": { name: "Valid Accounts", tactics: ["stealth", "persistence", "privilege-escalation", "initial-access"] },
+  "T1078":     { name: "Valid Accounts", tactics: ["stealth", "persistence", "privilege-escalation", "initial-access"] },
   "T1110.001": { name: "Brute Force: Password Guessing", tactics: ["credential-access"] },
-  "T1595": { name: "Active Scanning", tactics: ["reconnaissance"] },
-  "T1595.003": { name: "Active Scanning: Wordlist Scanning", tactics: ["reconnaissance"] },
-  "T1033": { name: "System Owner/User Discovery", tactics: ["discovery"] },
-  "T1082": { name: "System Information Discovery", tactics: ["discovery"] },
-  "T1083": { name: "File and Directory Discovery", tactics: ["discovery"] },
+  "T1033":     { name: "System Owner/User Discovery", tactics: ["discovery"] },
+  "T1082":     { name: "System Information Discovery", tactics: ["discovery"] },
+  "T1083":     { name: "File and Directory Discovery", tactics: ["discovery"] },
   "T1087.001": { name: "Account Discovery: Local Account", tactics: ["discovery"] },
   "T1003.008": { name: "OS Credential Dumping: /etc/passwd and /etc/shadow", tactics: ["credential-access"] },
-  "T1057": { name: "Process Discovery", tactics: ["discovery"] },
-  "T1016": { name: "System Network Configuration Discovery", tactics: ["discovery"] },
-  "T1049": { name: "System Network Connections Discovery", tactics: ["discovery"] },
-  "T1105": { name: "Ingress Tool Transfer", tactics: ["command-and-control"] },
+  "T1057":     { name: "Process Discovery", tactics: ["discovery"] },
+  "T1016":     { name: "System Network Configuration Discovery", tactics: ["discovery"] },
+  "T1049":     { name: "System Network Connections Discovery", tactics: ["discovery"] },
+  "T1105":     { name: "Ingress Tool Transfer", tactics: ["command-and-control"] },
   "T1222.002": { name: "File and Directory Permissions Modification: Linux and Mac Permissions", tactics: ["defense-impairment"] },
   "T1053.003": { name: "Scheduled Task/Job: Cron", tactics: ["execution", "persistence", "privilege-escalation"] },
-  "T1548.003": { name: "Abuse Elevation Control Mechanism: Sudo and Sudo Caching", tactics: ["privilege-escalation"] },
   "T1070.003": { name: "Indicator Removal: Clear Command History", tactics: ["stealth"] },
-  "T1070.004": { name: "Indicator Removal: File Deletion", tactics: ["stealth"] },
   "T1136.001": { name: "Create Account: Local Account", tactics: ["persistence"] },
   "T1098.004": { name: "Account Manipulation: SSH Authorized Keys", tactics: ["persistence", "privilege-escalation"] },
   "T1059.004": { name: "Command and Scripting Interpreter: Unix Shell", tactics: ["execution"] },
 };
 
-// [pattern, technique, confidence]. One command can match several rules.
+// [pattern, technique, confidence]. Tested on each part of a chained command.
 const COMMAND_RULES = [
   [/^(whoami|id|w|who|users|last)\b/, "T1033", "medium"],
   [/\b(uname|hostname|lscpu|free|df|dmesg)\b|\/proc\/(cpuinfo|meminfo|version)|\/etc\/(os-release|issue)\b/, "T1082", "medium"],
@@ -56,13 +53,14 @@ const COMMAND_RULES = [
   [/\b(wget|curl|tftp|ftpget|scp)\b/, "T1105", "medium"],
   [/\bchmod\s+(\+x|[0-7]{3,4})\b/, "T1222.002", "medium"],
   [/\bcrontab\b|\/etc\/cron/, "T1053.003", "medium"],
-  [/^sudo\b/, "T1548.003", "medium"],
   [/history\s+-c|unset\s+HISTFILE|HISTSIZE=0/, "T1070.003", "medium"],
-  [/^rm\s/, "T1070.004", "low"],
   [/\b(useradd|adduser)\b/, "T1136.001", "medium"],
   [/authorized_keys/, "T1098.004", "medium"],
-  [/^(sh|bash|dash)\s/, "T1059.004", "low"],
+  [/^(sh|bash|dash)\b/, "T1059.004", "low"],
 ];
+
+// "a; b && c | d" becomes ["a", "b", "c", "d"]
+const splitChain = (cmd) => cmd.split(/\s*(?:;|&&|\|\||\||\n)\s*/).filter(Boolean);
 
 function mapAttack(ev) {
   const found = new Map();
@@ -71,16 +69,13 @@ function mapAttack(ev) {
   };
   if (ev.event_type === "login_attempt") {
     if (ev.success === true) add("T1078", "medium");
-    else add("T1110.001", "low");
+    else if (ev.success === false) add("T1110.001", "low");
   }
   if (ev.event_type === "command" && ev.command) {
-    const cmd = ev.command.trim();
-    for (const [re, id, confidence] of COMMAND_RULES) if (re.test(cmd)) add(id, confidence);
+    for (const part of splitChain(ev.command.trim())) {
+      for (const [re, id, confidence] of COMMAND_RULES) if (re.test(part)) add(id, confidence);
+    }
   }
-  if (ev.decoy === "web-portal" && ev.event_type === "request" && ev.raw && !["/", "/login"].includes(ev.raw.path)) {
-    add("T1595.003", "low");
-  }
-  if (ev.decoy === "dionaea" && ev.event_type === "connect") add("T1595", "low");
   return [...found.values()];
 }
 
