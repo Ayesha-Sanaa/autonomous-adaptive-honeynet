@@ -24,6 +24,19 @@ function top(events, field, n = 5) {
     .toArray();
 }
 
+// Events per calendar day (UTC) for the last `days` days, oldest first.
+function byDay(events, days) {
+  const since = new Date(Date.now() - days * 86400000);
+  return events
+    .aggregate([
+      { $match: { timestamp: { $gte: since } } },
+      { $group: { _id: { $dateToString: { format: "%Y-%m-%d", date: "$timestamp" } }, count: { $sum: 1 } } },
+      { $sort: { _id: 1 } },
+      { $project: { _id: 0, day: "$_id", count: 1 } },
+    ])
+    .toArray();
+}
+
 // Reads a small JSON body (max 10 KB).
 function readJson(req) {
   return new Promise((resolve, reject) => {
@@ -141,6 +154,7 @@ function buildServer(db) {
           top_usernames: await top(events, "username"),
           top_passwords: await top(events, "password"),
           top_commands: await top(events, "command"),
+          by_day: await byDay(events, 30),
         });
       }
 
