@@ -23,6 +23,7 @@ const TACTICS = {
 const TECHNIQUES = {
   "T1078":     { name: "Valid Accounts", tactics: ["stealth", "persistence", "privilege-escalation", "initial-access"] },
   "T1110.001": { name: "Brute Force: Password Guessing", tactics: ["credential-access"] },
+  "T1595":     { name: "Active Scanning", tactics: ["reconnaissance"] },
   "T1033":     { name: "System Owner/User Discovery", tactics: ["discovery"] },
   "T1082":     { name: "System Information Discovery", tactics: ["discovery"] },
   "T1083":     { name: "File and Directory Discovery", tactics: ["discovery"] },
@@ -79,4 +80,27 @@ function mapAttack(ev) {
   return [...found.values()];
 }
 
-module.exports = { ATTACK_VERSION, TACTICS, TECHNIQUES, mapAttack };
+// Behaviour rule (per attacker IP, not per event): one IP touching 3 or more
+// different decoys within 10 minutes is probing several services = Active Scanning.
+// visits = [{ d: "cowrie", t: Date }, ...]
+function scanTechnique(visits, minDecoys = 3, windowMs = 10 * 60 * 1000) {
+  const v = visits.filter((x) => x.d && x.t).sort((a, b) => a.t - b.t);
+  const inWindow = new Map(); // decoy -> how many visits are inside the window
+  let left = 0;
+  for (let right = 0; right < v.length; right++) {
+    inWindow.set(v[right].d, (inWindow.get(v[right].d) || 0) + 1);
+    while (v[right].t - v[left].t > windowMs) {
+      const k = v[left].d;
+      inWindow.set(k, inWindow.get(k) - 1);
+      if (inWindow.get(k) === 0) inWindow.delete(k);
+      left++;
+    }
+    if (inWindow.size >= minDecoys) {
+      const { name, tactics } = TECHNIQUES["T1595"];
+      return { id: "T1595", name, tactics, confidence: "medium", reason: `${minDecoys}+ decoys within ${windowMs / 60000} minutes` };
+    }
+  }
+  return null;
+}
+
+module.exports = { ATTACK_VERSION, TACTICS, TECHNIQUES, mapAttack, scanTechnique };

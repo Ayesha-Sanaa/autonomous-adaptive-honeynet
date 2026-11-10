@@ -1,5 +1,6 @@
 const http = require("http");
 const { MongoClient } = require("mongodb");
+const { attackersPipeline, sessionsPipeline, shapeAttacker, shapeSession } = require("./analytics");
 
 const MONGO_URL = process.env.MONGO_URL || "mongodb://mongodb:27017";
 const PORT = Number(process.env.PORT || 3001);
@@ -66,6 +67,18 @@ function top(events, field, n = 5) {
             top_passwords: await top(events, "password"),
             top_commands: await top(events, "command"),
           });
+        }
+
+        if (url.pathname === "/attackers") {
+          const limit = Math.min(Number(url.searchParams.get("limit")) || 50, 200);
+          const docs = await events.aggregate(attackersPipeline(limit)).toArray();
+          return send(res, 200, docs.map(shapeAttacker));
+        }
+
+        if (url.pathname === "/sessions") {
+          const limit = Math.min(Number(url.searchParams.get("limit")) || 50, 200);
+          const docs = await events.aggregate(sessionsPipeline(limit)).toArray();
+          return send(res, 200, docs.map(shapeSession));
         }
 
         send(res, 404, { error: "not found" });
