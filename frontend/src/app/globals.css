@@ -1,22 +1,23 @@
 @import "tailwindcss";
 
+/* Colour scheme: calm slate base, one honey amber accent, muted status colours. */
 @theme {
-  --color-bg: #000000;
-  --color-surface: #181818;
-  --color-surface-2: #1f1f1f;
-  --color-line: #272727;
-  --color-line-strong: #313131;
-  --color-fg: #ededed;
-  --color-muted: #a1a1a1;
-  --color-faint: #7a7a7a;
-  --color-brand: #2dd4bf;
-  --color-brand-strong: #14b8a6;
-  --color-danger: #fb7185;
-  --color-warn: #fbbf24;
-  --color-ok: #4ade80;
+  --color-bg: #11151c;
+  --color-surface: #171c25;
+  --color-surface-2: #1d2330;
+  --color-line: #252c38;
+  --color-line-strong: #313a49;
+  --color-fg: #e7eaf0;
+  --color-muted: #9aa4b2;
+  --color-faint: #6f7a8a;
+  --color-brand: #e5a93d;
+  --color-brand-strong: #cf9529;
+  --color-info: #8ba3c7;
+  --color-danger: #f0616d;
+  --color-warn: #ec8b3c;
+  --color-ok: #5cc98a;
   --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, monospace;
-  --ease-base: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 html {
@@ -30,48 +31,34 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-h1, h2, h3 {
-  text-wrap: balance;
-}
+h1, h2, h3 { text-wrap: balance; }
+p { text-wrap: pretty; }
+em, i { font-style: normal; }
 
-p {
-  text-wrap: pretty;
-}
-
-em, i {
-  font-style: normal;
-}
-
-::selection {
-  background: color-mix(in srgb, var(--color-brand) 35%, transparent);
-}
-
-:focus-visible {
-  outline: 2px solid var(--color-brand);
-  outline-offset: 2px;
-}
+::selection { background: color-mix(in srgb, var(--color-brand) 30%, transparent); }
+:focus-visible { outline: 2px solid var(--color-brand); outline-offset: 2px; }
 
 * {
   scrollbar-width: thin;
   scrollbar-color: var(--color-line-strong) transparent;
 }
 
-@keyframes fade-up {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: none; }
+/* One shared, calm transition for hover states. */
+.smooth {
+  transition: background-color 0.3s cubic-bezier(0.22, 1, 0.36, 1),
+    color 0.3s cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 0.3s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 @keyframes fade-in {
   from { opacity: 0; }
   to { opacity: 1; }
 }
-
-.fade-up {
-  animation: fade-up 0.5s var(--ease-base) both;
-}
+.fade-in, .fade-up { animation: fade-in 0.3s cubic-bezier(0.22, 1, 0.36, 1) both; }
 
 @media (prefers-reduced-motion: reduce) {
-  .fade-up {
-    animation: fade-in 0.3s var(--ease-base) both;
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
   }
 }

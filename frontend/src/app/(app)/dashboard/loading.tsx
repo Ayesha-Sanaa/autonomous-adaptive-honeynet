@@ -1,13 +1,18 @@
+// Skeleton shaped like the Overview, shown while the data loads.
 export default function Loading() {
   return (
-    <div className="mx-auto max-w-7xl animate-pulse" aria-busy="true">
-      <div className="mb-8 h-8 w-40 rounded-md bg-surface-2" />
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-        {Array.from({ length: 5 }).map((_, i) => <div key={i} className="h-28 rounded-xl border border-line bg-surface" />)}
-      </div>
-      <div className="mt-4 grid gap-4 lg:grid-cols-3">
-        <div className="h-80 rounded-xl border border-line bg-surface lg:col-span-2" />
-        <div className="h-80 rounded-xl border border-line bg-surface" />
+    <div className="mx-auto max-w-7xl space-y-6" aria-busy="true">
+      <div className="h-12 w-64 animate-pulse rounded-md bg-surface" />
+      <div className="h-24 animate-pulse rounded-lg bg-surface" />
+      <div className="grid gap-6 xl:grid-cols-3">
+        <div className="space-y-6 xl:col-span-2">
+          <div className="h-64 animate-pulse rounded-lg bg-surface" />
+          <div className="h-80 animate-pulse rounded-lg bg-surface" />
+        </div>
+        <div className="space-y-6">
+          <div className="h-64 animate-pulse rounded-lg bg-surface" />
+          <div className="h-48 animate-pulse rounded-lg bg-surface" />
+        </div>
       </div>
     </div>
   );

@@ -1,64 +1,43 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
-import { Radar, ShieldCheck, Network } from "lucide-react";
 import { getCurrentUser } from "@/lib/api";
 import { Brand } from "@/components/logo";
 import { LoginForm } from "./login-form";
 
 export const metadata: Metadata = { title: "Sign in" };
 
-const points = [
-  { icon: Network, title: "Four decoy services", text: "Fake SSH, web, login and SMB targets that only attackers ever touch." },
-  { icon: Radar, title: "Every attacker, one view", text: "Sessions, credentials and commands grouped by who sent them." },
-  { icon: ShieldCheck, title: "Mapped to MITRE ATT&CK", text: "Each action is labelled with the technique it matches, never guessed." },
-];
-
 export default async function LoginPage() {
   if (await getCurrentUser()) redirect("/dashboard");
 
   return (
-    <main className="grid min-h-screen lg:grid-cols-[1.1fr_1fr]">
-      <section className="relative hidden overflow-hidden border-r border-line lg:flex lg:flex-col lg:justify-between lg:p-14">
-        <div
-          className="pointer-events-none absolute inset-0"
-          style={{
-            backgroundImage:
-              "linear-gradient(to right, rgb(255 255 255 / 0.035) 1px, transparent 1px), linear-gradient(to bottom, rgb(255 255 255 / 0.035) 1px, transparent 1px)",
-            backgroundSize: "44px 44px",
-            maskImage: "radial-gradient(ellipse at 30% 20%, black, transparent 75%)",
-          }}
-        />
-        <div className="pointer-events-none absolute -left-32 -top-32 size-[520px] rounded-full bg-brand/10 blur-[120px]" />
+    <main className="grid min-h-screen lg:grid-cols-2">
+      <section className="hidden flex-col justify-between border-r border-line bg-surface p-12 lg:flex">
+        <Brand />
 
-        <div className="relative"><Brand /></div>
+        <div className="max-w-lg">
+          <h1 className="text-4xl font-semibold">See what attackers try before they reach anything real.</h1>
+          <p className="mt-4 text-base text-muted">
+            Four decoy services record every login, command and scan. Each action is matched to a MITRE ATT&amp;CK technique.
+          </p>
 
-        <div className="relative max-w-lg">
-          <h1 className="text-4xl font-semibold leading-[1.15] tracking-tight">
-            Watch attackers work, <span className="text-brand">without giving them anything real.</span>
-          </h1>
-          <ul className="mt-10 space-y-6">
-            {points.map(({ icon: Icon, title, text }) => (
-              <li key={title} className="flex gap-4">
-                <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg border border-line bg-surface text-brand">
-                  <Icon className="size-[18px]" />
-                </span>
-                <div>
-                  <div className="text-sm font-medium">{title}</div>
-                  <div className="mt-0.5 text-sm leading-relaxed text-muted">{text}</div>
-                </div>
-              </li>
-            ))}
-          </ul>
+          <div className="mt-10 rounded-lg border border-line bg-bg p-4">
+            <p className="text-xs text-faint">Example entry, not real data</p>
+            <div className="mt-3 space-y-1 font-mono text-xs leading-5 text-muted">
+              <p><span className="text-faint">14:02:11</span> cowrie 203.0.113.24 login root <span className="text-danger">failed</span> <span className="text-fg">T1110.001</span></p>
+              <p><span className="text-faint">14:02:14</span> cowrie 203.0.113.24 login admin <span className="text-ok">accepted</span> <span className="text-fg">T1078</span></p>
+              <p><span className="text-faint">14:02:19</span> cowrie 203.0.113.24 command whoami <span className="text-fg">T1033</span></p>
+            </div>
+          </div>
         </div>
 
-        <p className="relative text-xs text-faint">Final year project · BS Information Technology</p>
+        <p className="text-xs text-faint">Final year project, BS Information Technology</p>
       </section>
 
       <section className="flex items-center justify-center px-6 py-12">
-        <div className="fade-up w-full max-w-sm">
+        <div className="w-full max-w-sm">
           <div className="mb-10 lg:hidden"><Brand /></div>
-          <h2 className="text-2xl font-semibold tracking-tight">Sign in</h2>
-          <p className="mt-2 text-sm text-muted">Authorised analysts only. Accounts are created by an administrator.</p>
+          <h2 className="text-2xl font-semibold">Sign in</h2>
+          <p className="mt-2 text-sm text-muted">Accounts are created by an administrator. If you cannot sign in, ask them to reset your password.</p>
           <LoginForm />
         </div>
       </section>

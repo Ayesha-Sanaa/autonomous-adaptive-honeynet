@@ -35,3 +35,8 @@ export function fillDays(rows: { day: string; count: number }[], days: number, t
   }
   return out;
 }
+
+/** Attacker text is only ever shown as plain text. Control characters (like terminal escape codes) are made visible, never run. */
+export function visible(s: string): string {
+  return s.replace(/[\u0000-\u001f\u007f]/g, (c) => `\\x${c.charCodeAt(0).toString(16).padStart(2, "0")}`);
+}

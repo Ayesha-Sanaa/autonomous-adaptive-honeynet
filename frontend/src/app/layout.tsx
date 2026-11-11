@@ -4,12 +4,12 @@ import { GeistMono } from "geist/font/mono";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: { default: "Honeynet", template: "%s · Honeynet" },
-  description: "Autonomous Adaptive Honeynet: live attacker activity mapped to MITRE ATT&CK.",
+  title: { default: "Honeynet", template: "%s | Honeynet" },
+  description: "Autonomous Adaptive Honeynet: attacker activity mapped to MITRE ATT&CK.",
   robots: { index: false, follow: false },
 };
 
-export const viewport: Viewport = { themeColor: "#080c11" };
+export const viewport: Viewport = { themeColor: "#11151c" };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (

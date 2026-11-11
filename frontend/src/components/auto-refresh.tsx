@@ -3,8 +3,8 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 
-// Re-fetches the page's server data every few seconds so the dashboard stays live without a manual reload.
-export function AutoRefresh({ seconds = 30 }: { seconds?: number }) {
+/** Re-fetches the page data every few seconds, but only while the tab is visible. */
+export function AutoRefresh({ seconds }: { seconds: number }) {
   const router = useRouter();
   useEffect(() => {
     const id = setInterval(() => {
