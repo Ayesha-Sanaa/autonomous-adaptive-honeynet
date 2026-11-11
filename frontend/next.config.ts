@@ -1,9 +1,12 @@
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import type { NextConfig } from "next";
+
+const here = path.dirname(fileURLToPath(import.meta.url));
 
 const nextConfig: NextConfig = {
   output: "standalone", // small self-contained build for the Docker image
-  outputFileTracingRoot: path.join(__dirname), // keep server.js at the top of the build, wherever the repo lives
+  outputFileTracingRoot: here, // keep server.js at the top of the build, wherever the repo lives
   poweredByHeader: false,
   async headers() {
     return [
@@ -21,3 +24,4 @@ const nextConfig: NextConfig = {
 };
 
 export default nextConfig;
+

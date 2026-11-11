@@ -1,14 +1,14 @@
 @import "tailwindcss";
 
-/* Colour scheme: dark, teal as the one accent colour. */
 @theme {
-  --color-bg: #080c11;
-  --color-surface: #0e141b;
-  --color-surface-2: #141c25;
-  --color-line: #1d2834;
-  --color-fg: #e6edf3;
-  --color-muted: #8b9bab;
-  --color-faint: #5d6c7b;
+  --color-bg: #000000;
+  --color-surface: #181818;
+  --color-surface-2: #1f1f1f;
+  --color-line: #272727;
+  --color-line-strong: #313131;
+  --color-fg: #ededed;
+  --color-muted: #a1a1a1;
+  --color-faint: #7a7a7a;
   --color-brand: #2dd4bf;
   --color-brand-strong: #14b8a6;
   --color-danger: #fb7185;
@@ -16,6 +16,7 @@
   --color-ok: #4ade80;
   --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, monospace;
+  --ease-base: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 html {
@@ -29,22 +30,48 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+h1, h2, h3 {
+  text-wrap: balance;
+}
+
+p {
+  text-wrap: pretty;
+}
+
+em, i {
+  font-style: normal;
+}
+
 ::selection {
   background: color-mix(in srgb, var(--color-brand) 35%, transparent);
 }
 
-/* Subtle scrollbars that match the theme */
+:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+}
+
 * {
   scrollbar-width: thin;
-  scrollbar-color: var(--color-line) transparent;
+  scrollbar-color: var(--color-line-strong) transparent;
 }
 
 @keyframes fade-up {
-  from { opacity: 0; transform: translateY(6px); }
+  from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: none; }
 }
-.fade-up { animation: fade-up 0.35s ease-out both; }
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.fade-up {
+  animation: fade-up 0.5s var(--ease-base) both;
+}
 
 @media (prefers-reduced-motion: reduce) {
-  .fade-up { animation: none; }
+  .fade-up {
+    animation: fade-in 0.3s var(--ease-base) both;
+  }
 }
