@@ -12,10 +12,10 @@ function send(res, status, body) {
   res.end(JSON.stringify(body));
 }
 
-function top(events, field, n = 5) {
+function top(events, queryFilter, field, n = 5) {
   return events
     .aggregate([
-      { $match: { [field]: { $ne: null } } },
+      { $match: { ...queryFilter, [field]: { $ne: null } } },
       { $group: { _id: `$${field}`, count: { $sum: 1 } } },
       { $sort: { count: -1 } },
       { $limit: n },
@@ -24,12 +24,11 @@ function top(events, field, n = 5) {
     .toArray();
 }
 
-// Events per calendar day (UTC) for the last `days` days, oldest first.
-function byDay(events, days) {
+function byDay(events, queryFilter, days) {
   const since = new Date(Date.now() - days * 86400000);
   return events
     .aggregate([
-      { $match: { timestamp: { $gte: since } } },
+      { $match: { ...queryFilter, timestamp: { $gte: since } } },
       { $group: { _id: { $dateToString: { format: "%Y-%m-%d", date: "$timestamp" } }, count: { $sum: 1 } } },
       { $sort: { _id: 1 } },
       { $project: { _id: 0, day: "$_id", count: 1 } },
@@ -37,7 +36,33 @@ function byDay(events, days) {
     .toArray();
 }
 
-// Reads a small JSON body (max 10 KB).
+function byDayDecoy(events, queryFilter, days) {
+  const since = new Date(Date.now() - days * 86400000);
+  return events
+    .aggregate([
+      { $match: { ...queryFilter, timestamp: { $gte: since } } },
+      {
+        $group: {
+          _id: {
+            day: { $dateToString: { format: "%Y-%m-%d", date: "$timestamp" } },
+            decoy: "$decoy",
+          },
+          count: { $sum: 1 },
+        },
+      },
+      { $sort: { "_id.day": 1 } },
+      {
+        $project: {
+          _id: 0,
+          day: "$_id.day",
+          decoy: "$_id.decoy",
+          count: 1,
+        },
+      },
+    ])
+    .toArray();
+}
+
 function readJson(req) {
   return new Promise((resolve, reject) => {
     let size = 0;
@@ -47,7 +72,7 @@ function readJson(req) {
       size += c.length;
       if (size > 10_000) {
         if (!tooBig) reject(new auth.HttpError(413, "body too large"));
-        tooBig = true; // keep nothing, just stop collecting
+        tooBig = true;
       } else chunks.push(c);
     });
     req.on("end", () => {
@@ -78,7 +103,6 @@ function buildServer(db) {
       const path = url.pathname;
       const method = req.method;
 
-      // ---- open routes ----
       if (path === "/health" && method === "GET") return send(res, 200, { ok: true });
 
       if (path === "/auth/login" && method === "POST") {
@@ -88,7 +112,6 @@ function buildServer(db) {
         return send(res, 200, session);
       }
 
-      // ---- everything below needs a signed-in user ----
       const token = bearer(req);
       const user = token ? await auth.sessionUser(db, token) : null;
       if (!user) return send(res, 401, { error: "not signed in" });
@@ -106,7 +129,6 @@ function buildServer(db) {
         return send(res, 200, { ok: true });
       }
 
-      // ---- admin only: manage accounts ----
       if (path === "/users" || path.startsWith("/users/")) {
         if (user.role !== "admin") return send(res, 403, { error: "admins only" });
         if (path === "/users" && method === "GET") return send(res, 200, await auth.listUsers(db));
@@ -121,11 +143,14 @@ function buildServer(db) {
         return send(res, 405, { error: "method not allowed" });
       }
 
-      // ---- data routes (read only) ----
       if (method !== "GET") return send(res, 405, { error: "method not allowed" });
 
+      // Base query filter: real by default, demo if ?data=demo
+      const isDemo = url.searchParams.get("data") === "demo";
+      const baseFilter = isDemo ? { synthetic: true } : { synthetic: { $ne: true } };
+
       if (path === "/events") {
-        const filter = {};
+        const filter = { ...baseFilter };
         for (const key of FILTERS) {
           const v = url.searchParams.get(key);
           if (v) filter[key] = String(v);
@@ -147,33 +172,36 @@ function buildServer(db) {
 
       if (path === "/stats") {
         return send(res, 200, {
-          total: await events.countDocuments(),
-          by_decoy: await top(events, "decoy", 10),
-          by_event_type: await top(events, "event_type", 10),
-          top_src_ip: await top(events, "src_ip"),
-          top_usernames: await top(events, "username"),
-          top_passwords: await top(events, "password"),
-          top_commands: await top(events, "command"),
-          by_day: await byDay(events, 30),
+          total: await events.countDocuments(baseFilter),
+          by_decoy: await top(events, baseFilter, "decoy", 10),
+          by_event_type: await top(events, baseFilter, "event_type", 10),
+          top_src_ip: await top(events, baseFilter, "src_ip"),
+          top_usernames: await top(events, baseFilter, "username"),
+          top_passwords: await top(events, baseFilter, "password"),
+          top_commands: await top(events, baseFilter, "command"),
+          by_day: await byDay(events, baseFilter, 30),
+          by_day_decoy: await byDayDecoy(events, baseFilter, 30),
         });
       }
 
       if (path === "/attackers") {
         const limit = Math.min(Number(url.searchParams.get("limit")) || 50, 200);
-        const docs = await events.aggregate(attackersPipeline(limit)).toArray();
+        const pipeline = [{ $match: baseFilter }, ...attackersPipeline(limit)];
+        const docs = await events.aggregate(pipeline).toArray();
         return send(res, 200, docs.map(shapeAttacker));
       }
 
       if (path === "/sessions") {
         const limit = Math.min(Number(url.searchParams.get("limit")) || 50, 200);
-        const docs = await events.aggregate(sessionsPipeline(limit)).toArray();
+        const pipeline = [{ $match: baseFilter }, ...sessionsPipeline(limit)];
+        const docs = await events.aggregate(pipeline).toArray();
         return send(res, 200, docs.map(shapeSession));
       }
 
       send(res, 404, { error: "not found" });
     } catch (err) {
       if (err instanceof auth.HttpError) {
-        if (err.status === 413) res.once("finish", () => req.destroy()); // answer first, then drop the connection
+        if (err.status === 413) res.once("finish", () => req.destroy());
         return send(res, err.status, { error: err.message });
       }
       console.error(err.message);
