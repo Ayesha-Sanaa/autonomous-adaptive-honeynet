@@ -1,10 +1,8 @@
-// Builds the "attackers" and "sessions" views from raw events.
-// MongoDB groups the events; the small JS helpers below tidy the result.
-const { scanTechnique } = require("./mitre");
+﻿const { scanTechnique } = require("./mitre");
 
-// One row per attacker IP.
-const attackersPipeline = (limit) => [
-  { $match: { src_ip: { $ne: null } } },
+// One row per attacker IP (or filtered by specific IP and/or demo mode)
+const attackersPipeline = (limit, matchQuery = { src_ip: { $ne: null } }) => [
+  { $match: matchQuery },
   { $sort: { timestamp: 1 } },
   {
     $group: {
@@ -18,12 +16,11 @@ const attackersPipeline = (limit) => [
     },
   },
   { $sort: { events: -1 } },
-  { $limit: limit },
+  ...(limit ? [{ $limit: limit }] : []),
 ];
 
-// One row per session (a session id ties one attacker's connection together).
-const sessionsPipeline = (limit) => [
-  { $match: { session: { $ne: null } } },
+const sessionsPipeline = (limit, matchQuery = { session: { $ne: null } }) => [
+  { $match: matchQuery },
   { $sort: { timestamp: 1 } },
   {
     $group: {
@@ -39,10 +36,9 @@ const sessionsPipeline = (limit) => [
     },
   },
   { $sort: { start: -1 } },
-  { $limit: limit },
+  ...(limit ? [{ $limit: limit }] : []),
 ];
 
-// [[techniqueA, techniqueB], [techniqueA]] -> [{ id, name, tactics, events }] most used first
 function countTechniques(lists) {
   const counts = new Map();
   for (const list of lists) {
@@ -63,8 +59,8 @@ function shapeAttacker(doc) {
     first_seen: doc.first_seen,
     last_seen: doc.last_seen,
     decoys: doc.decoys.sort(),
-    techniques: countTechniques(doc.techniques), // seen in single events
-    behaviours: scan ? [scan] : [], // seen across the attacker's whole activity
+    techniques: countTechniques(doc.techniques),
+    behaviours: scan ? [scan] : [],
   };
 }
 

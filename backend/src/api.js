@@ -1,4 +1,4 @@
-const http = require("http");
+﻿const http = require("http");
 const { MongoClient } = require("mongodb");
 const { attackersPipeline, sessionsPipeline, shapeAttacker, shapeSession } = require("./analytics");
 const auth = require("./auth");
@@ -145,7 +145,6 @@ function buildServer(db) {
 
       if (method !== "GET") return send(res, 405, { error: "method not allowed" });
 
-      // Base query filter: real by default, demo if ?data=demo
       const isDemo = url.searchParams.get("data") === "demo";
       const baseFilter = isDemo ? { synthetic: true } : { synthetic: { $ne: true } };
 
@@ -191,11 +190,31 @@ function buildServer(db) {
         return send(res, 200, docs.map(shapeAttacker));
       }
 
+      if (path.startsWith("/attackers/")) {
+        const ip = decodeURIComponent(path.slice(11));
+        if (!ip) return send(res, 400, { error: "missing IP" });
+        const filter = { ...baseFilter, src_ip: ip };
+        const pipeline = [{ $match: filter }, ...attackersPipeline(1)];
+        const docs = await events.aggregate(pipeline).toArray();
+        if (!docs.length) return send(res, 404, { error: "attacker not found" });
+        return send(res, 200, shapeAttacker(docs[0]));
+      }
+
       if (path === "/sessions") {
         const limit = Math.min(Number(url.searchParams.get("limit")) || 50, 200);
         const pipeline = [{ $match: baseFilter }, ...sessionsPipeline(limit)];
         const docs = await events.aggregate(pipeline).toArray();
         return send(res, 200, docs.map(shapeSession));
+      }
+
+      if (path.startsWith("/sessions/")) {
+        const sessionId = decodeURIComponent(path.slice(10));
+        if (!sessionId) return send(res, 400, { error: "missing session id" });
+        const filter = { ...baseFilter, session: sessionId };
+        const pipeline = [{ $match: filter }, ...sessionsPipeline(1)];
+        const docs = await events.aggregate(pipeline).toArray();
+        if (!docs.length) return send(res, 404, { error: "session not found" });
+        return send(res, 200, shapeSession(docs[0]));
       }
 
       send(res, 404, { error: "not found" });
