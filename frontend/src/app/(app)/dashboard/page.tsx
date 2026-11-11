@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+﻿import type { Metadata } from "next";
 import Link from "next/link";
 import { WarningCircle } from "@phosphor-icons/react/dist/ssr";
 import { api } from "@/lib/api";
@@ -48,7 +48,6 @@ export default async function OverviewPage() {
     api<EventRow[]>("/events?limit=12"),
   ]);
 
-  // Every technique seen, from single events and from attacker behaviour, counted once per attacker/session.
   const techniques = new Map<string, { id: string; name: string; tactics: string[]; count: number }>();
   const bump = (t: { id: string; name: string; tactics: string[] }, by: number) => {
     const cur = techniques.get(t.id) ?? { ...t, count: 0 };
@@ -61,7 +60,6 @@ export default async function OverviewPage() {
   }
   const techList = [...techniques.values()];
 
-  // Technique hits grouped by their first tactic, for the tactics donut.
   const byTactic = new Map<string, number>();
   for (const t of techList) byTactic.set(t.tactics[0] ?? "other", (byTactic.get(t.tactics[0] ?? "other") ?? 0) + t.count);
 
@@ -120,7 +118,7 @@ export default async function OverviewPage() {
 
       <div className="grid gap-6 xl:grid-cols-3">
         <Panel title="Events per day" hint={`${formatDay(days[0].day)} to ${formatDay(days[days.length - 1].day)}`} className="xl:col-span-2">
-          {stats.total === 0 ? <Empty title="No events yet">They appear here as soon as something touches a decoy.</Empty> : <DayBars data={days} />}
+          {stats.total === 0 ? <Empty title="No events yet">They appear here as soon as something touches a decoy.</Empty> : <DayBars days={days} dayDecoys={stats.by_day_decoy} />}
         </Panel>
 
         <Panel title="Needs attention" hint="open each one" flush>

@@ -1,10 +1,7 @@
-// Shapes returned by the backend API (backend/src/api.js).
-export type User = { username: string; role: "admin" | "analyst" };
+﻿export type Counted = { value: string; count: number };
 
-export type Technique = { id: string; name: string; tactics: string[]; confidence?: string };
-export type CountedTechnique = Technique & { events: number };
-
-export type Counted = { value: string; count: number };
+export type DayPoint = { day: string; count: number };
+export type DayDecoyPoint = { day: string; decoy: string; count: number };
 
 export type Stats = {
   total: number;
@@ -14,7 +11,24 @@ export type Stats = {
   top_usernames: Counted[];
   top_passwords: Counted[];
   top_commands: Counted[];
-  by_day: { day: string; count: number }[];
+  by_day: DayPoint[];
+  by_day_decoy?: DayDecoyPoint[];
+};
+
+export type EventRow = {
+  _id: string;
+  id: string;
+  decoy: string;
+  protocol: string;
+  event_type: string;
+  src_ip?: string;
+  timestamp: string;
+  username?: string;
+  password?: string;
+  command?: string;
+  success?: boolean;
+  session?: string;
+  attack: { id: string; name: string; tactics: string[] }[];
 };
 
 export type Attacker = {
@@ -23,8 +37,8 @@ export type Attacker = {
   first_seen: string;
   last_seen: string;
   decoys: string[];
-  techniques: CountedTechnique[];
-  behaviours: (Technique & { reason?: string })[];
+  behaviours: { id: string; name: string; tactics: string[] }[];
+  techniques: { id: string; name: string; tactics: string[]; events: number }[];
 };
 
 export type Session = {
@@ -33,24 +47,13 @@ export type Session = {
   src_ip: string;
   start: string;
   end: string;
-  duration_s: number;
-  events: number;
-  logins: { username: string | null; success: boolean | null }[];
   login_success: boolean;
-  commands: string[];
-  techniques: CountedTechnique[];
+  logins: { username: string; password?: string; success: boolean; time: string }[];
+  commands: { command: string; time: string }[];
 };
 
-export type EventRow = {
-  _id: string;
-  decoy: string;
-  event_type: string;
-  src_ip: string | null;
-  protocol: string | null;
-  username: string | null;
-  password: string | null;
-  command: string | null;
-  success: boolean | null;
-  timestamp: string;
-  attack: Technique[];
+export type User = {
+  username: string;
+  role: "admin" | "analyst";
+  must_change_password?: boolean;
 };

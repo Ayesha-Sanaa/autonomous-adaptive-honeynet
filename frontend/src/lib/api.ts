@@ -1,10 +1,10 @@
-import "server-only";
+﻿import "server-only";
 import { cache } from "react";
 import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
 import { getToken } from "./session";
 import type { User } from "./types";
 
-// Only the dashboard server talks to the API; the browser never sees this address or the token.
 const API_URL = process.env.API_URL ?? "http://api:3001";
 
 export class ApiError extends Error {
@@ -15,7 +15,16 @@ export class ApiError extends Error {
 
 async function call(path: string, init: RequestInit & { token?: string | null } = {}) {
   const { token, ...rest } = init;
-  return fetch(API_URL + path, {
+  
+  // Demo mode cookie check
+  const isDemo = cookies().get("demo_mode")?.value === "1";
+  let finalPath = path;
+  
+  if (isDemo && (path.startsWith("/events") || path.startsWith("/stats") || path.startsWith("/attackers") || path.startsWith("/sessions"))) {
+    finalPath += path.includes("?") ? "&data=demo" : "?data=demo";
+  }
+
+  return fetch(API_URL + finalPath, {
     ...rest,
     cache: "no-store",
     signal: AbortSignal.timeout(8000),
@@ -26,7 +35,6 @@ async function call(path: string, init: RequestInit & { token?: string | null } 
   });
 }
 
-/** GET a protected API route for the signed-in user. Sends them to /login if the session is gone. */
 export async function api<T>(path: string): Promise<T> {
   const res = await call(path, { token: await getToken() });
   if (res.status === 401) redirect("/login");
@@ -34,7 +42,6 @@ export async function api<T>(path: string): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-/** The signed-in user, or null. Cached for the length of one request. */
 export const getCurrentUser = cache(async (): Promise<User | null> => {
   const token = await getToken();
   if (!token) return null;
@@ -66,7 +73,5 @@ export async function apiLogin(username: string, password: string): Promise<Logi
 export async function apiLogout(token: string) {
   try {
     await call("/auth/logout", { method: "POST", token });
-  } catch {
-    /* the cookie is removed anyway */
-  }
+  } catch {}
 }

@@ -1,11 +1,15 @@
-import { redirect } from "next/navigation";
+﻿import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
 import { getCurrentUser } from "@/lib/api";
 import { Sidebar } from "@/components/sidebar";
+import { DemoBanner } from "@/components/demo-banner";
 
-// Every page inside (app) needs a valid session; otherwise the visitor goes to the login page.
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
+
+  const c = await cookies();
+  const isDemo = c.get("demo_mode")?.value === "1";
 
   return (
     <div className="flex min-h-screen">
@@ -17,6 +21,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       </a>
       <Sidebar user={user} />
       <main id="content" className="min-w-0 flex-1 px-6 py-8 lg:px-10">
+        <DemoBanner isDemo={isDemo} />
         {children}
       </main>
     </div>

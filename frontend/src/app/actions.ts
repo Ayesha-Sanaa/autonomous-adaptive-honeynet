@@ -1,4 +1,4 @@
-"use server";
+﻿"use server";
 
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
@@ -24,8 +24,8 @@ export async function login(_prev: LoginState, form: FormData): Promise<LoginSta
   }
 
   (await cookies()).set(COOKIE, result.token, {
-    httpOnly: true, // page scripts cannot read it
-    sameSite: "strict", // never sent from other sites
+    httpOnly: true,
+    sameSite: "strict",
     secure: process.env.COOKIE_SECURE !== "false" && process.env.NODE_ENV === "production",
     path: "/",
     expires: new Date(result.expiresAt),
@@ -38,4 +38,14 @@ export async function logout() {
   if (token) await apiLogout(token);
   (await cookies()).delete(COOKIE);
   redirect("/login");
+}
+
+export async function toggleDemoMode(enabled: boolean) {
+  const c = await cookies();
+  if (enabled) {
+    c.set("demo_mode", "1", { path: "/", sameSite: "strict" });
+  } else {
+    c.delete("demo_mode");
+  }
+  redirect("/dashboard");
 }

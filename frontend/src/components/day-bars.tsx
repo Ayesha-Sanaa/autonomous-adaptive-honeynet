@@ -1,48 +1,67 @@
-import { formatDay } from "@/lib/format";
+﻿"use client";
 
-// Colour follows volume: quiet days are blue, busy days amber, the busiest red.
-function heat(t: number) {
-  return t < 0.5
-    ? `color-mix(in srgb, var(--color-brand) ${Math.round(t * 200)}%, var(--color-info))`
-    : `color-mix(in srgb, var(--color-danger) ${Math.round((t - 0.5) * 200)}%, var(--color-brand))`;
-}
+const DECOY_COLORS: Record<string, string> = {
+  cowrie: "#2dd4bf",
+  "web-portal": "#a3e635",
+  heralding: "#38bdf8",
+  dionaea: "#f472b6",
+};
 
-/** Events per day as plain bars. No animation, no curve: each day is a separate count. */
-export function DayBars({ data }: { data: { day: string; count: number }[] }) {
-  const max = Math.max(1, ...data.map((d) => d.count));
+export type DayDecoyPoint = { day: string; decoy: string; count: number };
+export type DayPoint = { day: string; count: number };
+
+export function DayBars({
+  days,
+  dayDecoys = [],
+}: {
+  days: DayPoint[];
+  dayDecoys?: DayDecoyPoint[];
+}) {
+  if (!days.length) return null;
+
+  const map = new Map<string, Record<string, number>>();
+  for (const item of dayDecoys) {
+    if (!map.has(item.day)) map.set(item.day, {});
+    const dayMap = map.get(item.day)!;
+    dayMap[item.decoy] = (dayMap[item.decoy] || 0) + item.count;
+  }
+
+  const maxCount = Math.max(...days.map((d) => d.count), 1);
+
   return (
-    <div>
-      <div className="flex h-44 items-end gap-2" role="img" aria-label={`Events per day for the last ${data.length} days`}>
-        {data.map((d) => (
-          <div key={d.day} title={`${formatDay(d.day)}: ${d.count} events`} className="flex h-full flex-1 flex-col items-center justify-end gap-1">
-            {d.count > 0 && <span className="text-xs text-muted">{d.count}</span>}
-            {d.count > 0 ? (
-              <div className="w-full rounded-sm" style={{ height: `${Math.max(4, (d.count / max) * 80)}%`, background: heat(d.count / max) }} />
-            ) : (
-              <div className="h-0.5 w-full bg-line-strong" />
-            )}
+    <div className="flex h-36 items-end gap-1.5 pt-4">
+      {days.map((d) => {
+        const decoyBreakdown = map.get(d.day) || {};
+        const total = d.count;
+        const heightPct = Math.round((total / maxCount) * 100);
+
+        return (
+          <div key={d.day} className="group relative flex flex-1 flex-col items-center h-full justify-end">
+            <div
+              style={{ height: `${heightPct}%` }}
+              className="w-full flex flex-col-reverse overflow-hidden rounded-t bg-line-strong transition-all group-hover:brightness-125"
+            >
+              {Object.entries(decoyBreakdown).map(([decoy, count]) => {
+                const segmentPct = (count / total) * 100;
+                return (
+                  <div
+                    key={decoy}
+                    style={{
+                      height: `${segmentPct}%`,
+                      backgroundColor: DECOY_COLORS[decoy] || "#e5a93d",
+                    }}
+                    title={`${decoy}: ${count}`}
+                  />
+                );
+              })}
+            </div>
+            <div className="pointer-events-none absolute bottom-full mb-2 hidden flex-col items-center rounded bg-surface-2 px-2 py-1 text-[11px] text-fg shadow group-hover:flex z-10 whitespace-nowrap border border-line">
+              <span className="font-mono text-brand">{d.day}</span>
+              <span className="font-semibold">{total} total events</span>
+            </div>
           </div>
-        ))}
-      </div>
-      <div className="mt-2 flex gap-2 text-xs text-faint">
-        {data.map((d) => (
-          <span key={d.day} className="flex-1 text-center">{Number(d.day.slice(8))}</span>
-        ))}
-      </div>
-      <div className="mt-4 flex items-center gap-2 text-xs text-faint">
-        <span>quiet</span>
-        <span className="h-1 w-24 rounded-sm" style={{ background: "linear-gradient(to right, var(--color-info), var(--color-brand), var(--color-danger))" }} />
-        <span>busy</span>
-      </div>
-      <table className="sr-only">
-        <caption>Events per day</caption>
-        <thead><tr><th>Day</th><th>Events</th></tr></thead>
-        <tbody>
-          {data.map((d) => (
-            <tr key={d.day}><td>{formatDay(d.day)}</td><td>{d.count}</td></tr>
-          ))}
-        </tbody>
-      </table>
+        );
+      })}
     </div>
   );
 }
