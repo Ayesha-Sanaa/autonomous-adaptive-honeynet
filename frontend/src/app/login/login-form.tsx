@@ -2,7 +2,7 @@
 
 import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
-import { Eye, EyeSlash, SpinnerGap, WarningCircle } from "@phosphor-icons/react";
+import { ArrowRight, Eye, EyeSlash, Lock, SpinnerGap, User, WarningCircle } from "@phosphor-icons/react";
 import { login, type LoginState } from "../actions";
 
 const initial: LoginState = { error: null, username: "" };
@@ -13,19 +13,29 @@ function SubmitButton() {
     <button
       type="submit"
       disabled={pending}
-      className="smooth flex h-10 w-full items-center justify-center gap-2 rounded-md bg-brand px-3 text-sm font-semibold text-bg hover:bg-brand-strong disabled:cursor-not-allowed disabled:opacity-70"
+      className="smooth group flex h-11 w-full items-center justify-center gap-2 rounded-md bg-brand px-4 text-sm font-semibold text-bg hover:bg-brand-strong disabled:cursor-not-allowed disabled:opacity-70"
     >
-      {pending ? (<><SpinnerGap size={16} className="animate-spin" /> Signing in</>) : "Sign in"}
+      {pending ? (
+        <>
+          <SpinnerGap size={16} className="animate-spin" /> Signing in
+        </>
+      ) : (
+        <>
+          Sign in
+          <ArrowRight size={16} weight="bold" className="smooth group-hover:translate-x-1" />
+        </>
+      )}
     </button>
   );
 }
 
 const field =
-  "smooth h-10 w-full rounded-md border border-line-strong bg-bg px-3 text-sm text-fg placeholder:text-faint outline-none focus:border-brand";
+  "smooth h-11 w-full rounded-md border border-line-strong bg-bg pl-10 pr-3 text-sm text-fg placeholder:text-faint outline-none focus:border-brand focus:ring-2 focus:ring-brand/20";
 
 export function LoginForm() {
   const [state, formAction] = useActionState(login, initial);
   const [show, setShow] = useState(false);
+  const [caps, setCaps] = useState(false);
 
   return (
     <form action={formAction} className="mt-8 space-y-6" noValidate>
@@ -38,20 +48,36 @@ export function LoginForm() {
 
       <div className="space-y-2">
         <label htmlFor="username" className="text-sm font-medium">Username</label>
-        <input id="username" name="username" type="text" autoComplete="username" autoCapitalize="none" spellCheck={false}
-          autoFocus required defaultValue={state.username} className={field} />
+        <div className="relative">
+          <User size={16} className="pointer-events-none absolute left-3 top-3.5 text-faint" />
+          <input id="username" name="username" type="text" autoComplete="username" autoCapitalize="none" spellCheck={false}
+            autoFocus required defaultValue={state.username} className={field} />
+        </div>
       </div>
 
       <div className="space-y-2">
         <label htmlFor="password" className="text-sm font-medium">Password</label>
         <div className="relative">
-          <input id="password" name="password" type={show ? "text" : "password"} autoComplete="current-password"
-            required className={`${field} pr-12`} />
-          <button type="button" onClick={() => setShow((s) => !s)} aria-label={show ? "Hide password" : "Show password"}
-            className="smooth absolute right-1 top-1 flex size-8 items-center justify-center rounded-md text-muted hover:bg-surface-2 hover:text-fg">
+          <Lock size={16} className="pointer-events-none absolute left-3 top-3.5 text-faint" />
+          <input
+            id="password" name="password" type={show ? "text" : "password"} autoComplete="current-password" required
+            onKeyUp={(e) => setCaps(e.getModifierState("CapsLock"))}
+            onKeyDown={(e) => setCaps(e.getModifierState("CapsLock"))}
+            onBlur={() => setCaps(false)}
+            className={`${field} pr-20`}
+          />
+          <button
+            type="button"
+            onClick={() => setShow((s) => !s)}
+            aria-label={show ? "Hide password" : "Show password"}
+            aria-pressed={show}
+            className="smooth absolute right-1 top-1 flex h-9 items-center gap-1 rounded-md px-2 text-xs font-medium text-muted hover:bg-surface-2 hover:text-fg"
+          >
             {show ? <EyeSlash size={16} /> : <Eye size={16} />}
+            {show ? "Hide" : "Show"}
           </button>
         </div>
+        {caps && <p className="text-xs text-warn">Caps Lock is on.</p>}
       </div>
 
       <SubmitButton />

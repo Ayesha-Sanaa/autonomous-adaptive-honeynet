@@ -2,13 +2,46 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { SquaresFour, SignOut } from "@phosphor-icons/react";
+import {
+  SquaresFour, Pulse, Crosshair, TerminalWindow, Target, HardDrives, GearSix, SignOut,
+} from "@phosphor-icons/react";
 import { Brand } from "./logo";
 import { logout } from "@/app/actions";
 import type { User } from "@/lib/types";
 
 // A page is added here only when it exists.
-const NAV = [{ href: "/dashboard", label: "Overview", icon: SquaresFour }];
+const NAV = [
+  { href: "/dashboard", label: "Overview", icon: SquaresFour },
+  { href: "/dashboard/events", label: "Events", icon: Pulse },
+  { href: "/dashboard/attackers", label: "Attackers", icon: Crosshair },
+  { href: "/dashboard/sessions", label: "Sessions", icon: TerminalWindow },
+  { href: "/dashboard/mitre", label: "MITRE ATT&CK", icon: Target },
+  { href: "/dashboard/decoys", label: "Decoys", icon: HardDrives },
+];
+const SETTINGS = { href: "/dashboard/settings", label: "Settings", icon: GearSix };
+
+function isActive(pathname: string, href: string) {
+  return href === "/dashboard" ? pathname === href : pathname.startsWith(href);
+}
+
+type Item = { href: string; label: string; icon: typeof SquaresFour };
+
+function NavLink({ item, active }: { item: Item; active: boolean }) {
+  const Icon = item.icon;
+  return (
+    <Link
+      href={item.href}
+      title={item.label}
+      aria-current={active ? "page" : undefined}
+      className={`smooth flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium max-lg:justify-center ${
+        active ? "bg-surface-2 text-fg" : "text-muted hover:bg-surface-2 hover:text-fg"
+      }`}
+    >
+      <Icon size={18} weight={active ? "fill" : "regular"} className={`shrink-0 ${active ? "text-brand" : ""}`} />
+      <span className="max-lg:hidden">{item.label}</span>
+    </Link>
+  );
+}
 
 export function Sidebar({ user }: { user: User }) {
   const pathname = usePathname();
@@ -19,25 +52,15 @@ export function Sidebar({ user }: { user: User }) {
         <span className="hidden max-lg:block"><Brand compact /></span>
       </div>
 
-      <nav className="mt-8 flex-1 space-y-1" aria-label="Main">
-        {NAV.map(({ href, label, icon: Icon }) => {
-          const active = href === "/dashboard" ? pathname === href : pathname.startsWith(href);
-          return (
-            <Link
-              key={href}
-              href={href}
-              title={label}
-              aria-current={active ? "page" : undefined}
-              className={`smooth flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium max-lg:justify-center ${
-                active ? "bg-surface-2 text-fg" : "text-muted hover:bg-surface-2 hover:text-fg"
-              }`}
-            >
-              <Icon size={18} className={`shrink-0 ${active ? "text-brand" : ""}`} />
-              <span className="max-lg:hidden">{label}</span>
-            </Link>
-          );
-        })}
+      <nav className="mt-8 flex-1 space-y-1 overflow-y-auto" aria-label="Main">
+        {NAV.map((item) => (
+          <NavLink key={item.href} item={item} active={isActive(pathname, item.href)} />
+        ))}
       </nav>
+
+      <div className="mb-3">
+        <NavLink item={SETTINGS} active={isActive(pathname, SETTINGS.href)} />
+      </div>
 
       <div className="border-t border-line pt-3">
         <div className="flex items-center gap-3 px-2 max-lg:justify-center">

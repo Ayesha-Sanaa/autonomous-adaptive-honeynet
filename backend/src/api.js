@@ -89,6 +89,14 @@ function readJson(req) {
   });
 }
 
+const dec = (s) => {
+  try {
+    return decodeURIComponent(s);
+  } catch {
+    throw new auth.HttpError(400, "bad path");
+  }
+};
+
 const bearer = (req) => {
   const m = /^Bearer (\S+)$/.exec(req.headers.authorization || "");
   return m ? m[1] : null;
@@ -110,6 +118,12 @@ function buildServer(db) {
         const session = await auth.login(db, username, password);
         if (!session) return send(res, 401, { error: "invalid username or password" });
         return send(res, 200, session);
+      }
+
+      if (path === "/auth/signup" && method === "POST") {
+        const { username, password, reason } = await readJson(req);
+        await auth.requestSignup(db, { username, password, reason });
+        return send(res, 202, { ok: true });
       }
 
       const token = bearer(req);
@@ -136,14 +150,35 @@ function buildServer(db) {
           const { username, password, role } = await readJson(req);
           return send(res, 201, await auth.createUser(db, { username, password, role }));
         }
+        if (path === "/users/requests" && method === "GET") return send(res, 200, await auth.listRequests(db));
+        let m = /^\/users\/requests\/([^/]+)\/approve$/.exec(path);
+        if (m && method === "POST") {
+          const { role } = await readJson(req);
+          return send(res, 200, await auth.approveRequest(db, user.username, dec(m[1]), role));
+        }
+        m = /^\/users\/requests\/([^/]+)$/.exec(path);
+        if (m && method === "DELETE") {
+          await auth.rejectRequest(db, user.username, dec(m[1]));
+          return send(res, 200, { ok: true });
+        }
+        m = /^\/users\/([^/]+)\/role$/.exec(path);
+        if (m && method === "POST") {
+          const { role } = await readJson(req);
+          return send(res, 200, await auth.setRole(db, user.username, dec(m[1]), role));
+        }
         if (path.startsWith("/users/") && method === "DELETE") {
-          await auth.deleteUser(db, user.username, decodeURIComponent(path.slice(7)));
+          await auth.deleteUser(db, user.username, dec(path.slice(7)));
           return send(res, 200, { ok: true });
         }
         return send(res, 405, { error: "method not allowed" });
       }
 
       if (method !== "GET") return send(res, 405, { error: "method not allowed" });
+
+      if (path === "/audit") {
+        if (user.role !== "admin") return send(res, 403, { error: "admins only" });
+        return send(res, 200, await auth.listAudit(db));
+      }
 
       const isDemo = url.searchParams.get("data") === "demo";
       const baseFilter = isDemo ? { synthetic: true } : { synthetic: { $ne: true } };

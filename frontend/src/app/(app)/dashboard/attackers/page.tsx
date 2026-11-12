@@ -1,145 +1,78 @@
-﻿import type { Metadata } from "next";
+import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound } from "next/navigation";
 import { api } from "@/lib/api";
-import type { Attacker, EventRow, Session } from "@/lib/types";
-import { formatNumber, formatTime, relativeTime, visible } from "@/lib/format";
-import { PageHeader, Panel, StatCell, DecoyBadge, ScannerBadge, TechniqueChip, Empty } from "@/components/ui";
+import type { Attacker, Session } from "@/lib/types";
+import { formatNumber, isPrivateIp, relativeTime } from "@/lib/format";
+import { AutoRefresh } from "@/components/auto-refresh";
+import { Empty, PageHeader, Panel, ScannerBadge, decoyColor, decoyLabel } from "@/components/ui";
 
-export async function generateMetadata({ params }: { params: Promise<{ ip: string }> }): Promise<Metadata> {
-  const { ip } = await params;
-  return { title: `Attacker ${decodeURIComponent(ip)}` };
-}
+export const metadata: Metadata = { title: "Attackers" };
 
-export default async function AttackerDetailPage({ params }: { params: Promise<{ ip: string }> }) {
-  const { ip: rawIp } = await params;
-  const ip = decodeURIComponent(rawIp);
+const DECOYS = ["cowrie", "web-portal", "heralding", "dionaea"];
 
-  let attacker: Attacker | null = null;
-  let events: EventRow[] = [];
-  let sessions: Session[] = [];
-
-  try {
-    [attacker, events, sessions] = await Promise.all([
-      api<Attacker>(`/attackers/${encodeURIComponent(ip)}`),
-      api<EventRow[]>(`/events?src_ip=${encodeURIComponent(ip)}&limit=100`),
-      api<Session[]>(`/sessions?limit=200`),
-    ]);
-  } catch {
-    notFound();
-  }
-
-  if (!attacker) notFound();
-
-  const ipSessions = sessions.filter((s) => s.src_ip === ip);
+export default async function AttackersPage() {
+  const [attackers, sessions] = await Promise.all([
+    api<Attacker[]>("/attackers?limit=200"),
+    api<Session[]>("/sessions?limit=200"),
+  ]);
   const now = Date.now();
+  const breachedIps = new Set(sessions.filter((s) => s.login_success).map((s) => s.src_ip));
+  const sorted = [...attackers].sort((a, b) => b.events - a.events);
+  const max = Math.max(1, ...sorted.map((a) => a.events));
 
   return (
     <div className="mx-auto max-w-7xl space-y-6">
-      <PageHeader
-        title={attacker.src_ip}
-        subtitle={`Detailed threat intelligence profile and activity log for IP ${attacker.src_ip}.`}
-      >
-        <div className="flex items-center gap-2">
-          <Link href="/dashboard/attackers" className="text-xs text-muted hover:text-fg">
-            &larr; Back to Attackers List
-          </Link>
-        </div>
-      </PageHeader>
+      <AutoRefresh seconds={30} />
+      <PageHeader title="Attackers" subtitle="Every address that touched a decoy, busiest first. Open one to see everything it did." />
 
-      <div className="grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-line bg-line lg:grid-cols-4">
-        <StatCell label="Total Events" value={formatNumber(attacker.events)} note="captured actions" />
-        <StatCell label="Decoys Probed" value={formatNumber(attacker.decoys.length)} note={attacker.decoys.join(", ")} />
-        <StatCell label="Sessions Established" value={formatNumber(ipSessions.length)} note="tracked connections" />
-        <StatCell label="Techniques Identified" value={formatNumber(attacker.techniques.length)} note="ATT&CK matches" />
-      </div>
-
-      {attacker.behaviours.length > 0 && (
-        <Panel title="Observed Threat Behaviours">
-          <div className="flex flex-wrap gap-2">
-            {attacker.behaviours.map((b) => (
-              <div key={b.id} className="flex items-center gap-2 rounded border border-warn/40 bg-warn/10 px-3 py-1.5 text-sm text-warn">
-                <ScannerBadge />
-                <span className="font-semibold">{b.id}: {b.name}</span>
-              </div>
-            ))}
-          </div>
-        </Panel>
-      )}
-
-      <Panel title="ATT&CK Techniques Triggered">
-        {attacker.techniques.length === 0 ? (
-          <Empty title="No techniques mapped" />
-        ) : (
-          <div className="flex flex-wrap gap-2">
-            {attacker.techniques.map((t) => (
-              <div key={t.id} className="flex items-center gap-2 rounded border border-line bg-surface-2 px-3 py-1.5 text-sm">
-                <TechniqueChip id={t.id} name={t.name} />
-                <span className="text-xs text-faint">({t.events} hits)</span>
-              </div>
-            ))}
-          </div>
-        )}
-      </Panel>
-
-      <Panel title="Sessions" flush>
-        {ipSessions.length === 0 ? (
-          <Empty title="No active or logged sessions" />
+      <Panel title={`${formatNumber(sorted.length)} ${sorted.length === 1 ? "attacker" : "attackers"}`} hint="by events" flush>
+        {sorted.length === 0 ? (
+          <Empty title="No attacker seen yet">Addresses appear here as soon as something touches a decoy.</Empty>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
+            <table className="w-full min-w-[820px] text-left text-sm">
               <thead className="border-b border-line text-xs text-faint">
                 <tr>
-                  <th className="px-4 py-2 font-normal">Session ID</th>
-                  <th className="px-4 py-2 font-normal">Decoy</th>
-                  <th className="px-4 py-2 font-normal">Duration</th>
-                  <th className="px-4 py-2 font-normal">Logins</th>
-                  <th className="px-4 py-2 font-normal">Commands Executed</th>
+                  <th className="px-4 py-2 font-normal">Address</th>
+                  <th className="px-4 py-2 font-normal">Events</th>
+                  <th className="px-4 py-2 font-normal">Decoys touched</th>
+                  <th className="px-4 py-2 font-normal">Techniques</th>
+                  <th className="px-4 py-2 font-normal">First seen</th>
+                  <th className="px-4 py-2 font-normal">Last seen</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-line">
-                {ipSessions.map((s) => (
-                  <tr key={s.session} className="smooth hover:bg-surface-2">
-                    <td className="px-4 py-3 font-mono text-xs truncate max-w-[150px]">{s.session}</td>
-                    <td className="px-4 py-3"><DecoyBadge decoy={s.decoy} /></td>
-                    <td className="px-4 py-3 tabular-nums">{s.duration_s}s</td>
+                {sorted.map((a) => (
+                  <tr key={a.src_ip} className="smooth hover:bg-surface-2">
                     <td className="px-4 py-3">
-                      <span className={s.login_success ? "text-danger font-semibold" : "text-muted"}>
-                        {s.logins.length} {s.login_success ? "(Breached)" : "attempts"}
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Link href={`/dashboard/attackers/${encodeURIComponent(a.src_ip)}`} className="font-mono text-sm text-fg underline decoration-line-strong underline-offset-4 hover:decoration-brand">
+                          {a.src_ip}
+                        </Link>
+                        {isPrivateIp(a.src_ip) && <span className="rounded border border-line-strong px-1.5 py-0.5 text-[11px] text-faint" title="This address is inside the test cluster network, not on the internet">internal</span>}
+                        {a.behaviours.some((b) => b.id === "T1595") && <ScannerBadge />}
+                        {breachedIps.has(a.src_ip) && <span className="rounded border border-danger/40 bg-danger/10 px-1.5 py-0.5 text-[11px] font-medium text-danger">got in</span>}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        <span className="w-8 tabular-nums">{formatNumber(a.events)}</span>
+                        <div className="h-1 w-24 rounded-sm bg-line">
+                          <div className="h-full rounded-sm bg-info" style={{ width: `${Math.max(4, (a.events / max) * 100)}%` }} />
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="flex items-center gap-1.5" title={a.decoys.map(decoyLabel).join(", ")}>
+                        {DECOYS.map((d) => (
+                          <span key={d} className="size-2.5 rounded-full" style={{ background: decoyColor(d), opacity: a.decoys.includes(d) ? 1 : 0.18 }} />
+                        ))}
+                        <span className="ml-1 text-xs text-faint">{a.decoys.length} of {DECOYS.length}</span>
                       </span>
                     </td>
-                    <td className="px-4 py-3 tabular-nums">{s.commands.length}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </Panel>
-
-      <Panel title="Recent Events Log" flush>
-        {events.length === 0 ? (
-          <Empty title="No recent events" />
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[720px] text-left text-sm">
-              <thead className="border-b border-line text-xs text-faint">
-                <tr>
-                  <th className="px-4 py-2 font-normal">Time (UTC)</th>
-                  <th className="px-4 py-2 font-normal">Decoy</th>
-                  <th className="px-4 py-2 font-normal">Event Type</th>
-                  <th className="px-4 py-2 font-normal">Details</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-line">
-                {events.map((e) => (
-                  <tr key={e._id} className="smooth hover:bg-surface-2">
-                    <td className="whitespace-nowrap px-4 py-3 text-muted">{formatTime(e.timestamp)}</td>
-                    <td className="px-4 py-3"><DecoyBadge decoy={e.decoy} /></td>
-                    <td className="px-4 py-3">{e.event_type.replace(/_/g, " ")}</td>
-                    <td className="px-4 py-3 font-mono text-xs truncate max-w-[300px]">
-                      {e.command ? visible(e.command) : e.username ? visible(e.username) : "-"}
-                    </td>
+                    <td className="px-4 py-3 tabular-nums text-muted">{a.techniques.length}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-muted">{relativeTime(a.first_seen, now)}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-muted">{relativeTime(a.last_seen, now)}</td>
                   </tr>
                 ))}
               </tbody>

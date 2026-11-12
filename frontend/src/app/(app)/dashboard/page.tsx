@@ -1,16 +1,25 @@
-﻿import type { Metadata } from "next";
+import type { Metadata } from "next";
 import Link from "next/link";
 import { WarningCircle } from "@phosphor-icons/react/dist/ssr";
 import { api } from "@/lib/api";
 import type { Attacker, Counted, EventRow, Session, Stats } from "@/lib/types";
-import { fillDays, formatDay, formatNumber, formatTime, relativeTime, visible } from "@/lib/format";
+import { fillDays, formatDay, formatNumber, formatTime, isPrivateIp, relativeTime, visible } from "@/lib/format";
 import { AutoRefresh } from "@/components/auto-refresh";
 import { AttackMatrix, tacticLabel } from "@/components/attack-matrix";
 import { DayBars } from "@/components/day-bars";
 import { Donut, PALETTE } from "@/components/donut";
+import { CredentialPairs, Funnel, HourHeat, type Pair } from "@/components/insights";
 import { DecoyBadge, Empty, PageHeader, Panel, ScannerBadge, StatCell, TechniqueChip, decoyColor, decoyLabel } from "@/components/ui";
 
 export const metadata: Metadata = { title: "Overview" };
+
+// An attacker with this many events or more is flagged as heavy activity.
+const HEAVY_EVENTS = 10;
+
+function Severity({ level }: { level: "High" | "Medium" }) {
+  const cls = level === "High" ? "border-danger/40 bg-danger/10 text-danger" : "border-warn/40 bg-warn/10 text-warn";
+  return <span className={`shrink-0 rounded border px-1.5 py-0.5 text-[11px] font-medium ${cls}`}>{level}</span>;
+}
 
 const rowLink = "smooth flex items-center justify-between gap-3 px-4 py-3 hover:bg-surface-2";
 
@@ -41,12 +50,14 @@ function TopList({ title, rows, color }: { title: string; rows: Counted[]; color
 }
 
 export default async function OverviewPage() {
-  const [stats, attackers, sessions, recent] = await Promise.all([
+  const [stats, attackers, sessions, events] = await Promise.all([
     api<Stats>("/stats"),
     api<Attacker[]>("/attackers?limit=200"),
     api<Session[]>("/sessions?limit=200"),
-    api<EventRow[]>("/events?limit=12"),
+    api<EventRow[]>("/events?limit=200"),
   ]);
+
+  const recent = events.slice(0, 12);
 
   const techniques = new Map<string, { id: string; name: string; tactics: string[]; count: number }>();
   const bump = (t: { id: string; name: string; tactics: string[] }, by: number) => {
@@ -65,16 +76,57 @@ export default async function OverviewPage() {
 
   const breached = sessions.filter((s) => s.login_success);
   const scanners = attackers.filter((a) => a.behaviours.some((b) => b.id === "T1595"));
+  const scannerIps = new Set(scanners.map((a) => a.src_ip));
+  const heavy = attackers.filter((a) => a.events >= HEAVY_EVENTS && !scannerIps.has(a.src_ip));
   const days = fillDays(stats.by_day, 14);
   const maxAttacker = Math.max(1, ...attackers.map((a) => a.events));
   const now = Date.now();
 
+  const todayCount = days[days.length - 1]?.count ?? 0;
+  const active24 = attackers.filter((a) => now - new Date(a.last_seen).getTime() < 86_400_000).length;
+  const busiest = attackers.reduce<Attacker | null>((m, a) => (!m || a.events > m.events ? a : m), null);
+
+  const hours = Array.from({ length: 24 }, () => 0);
+  for (const e of events) {
+    const h = new Date(e.timestamp).getUTCHours();
+    if (!Number.isNaN(h)) hours[h] += 1;
+  }
+
+  const pairMap = new Map<string, Pair>();
+  for (const e of events) {
+    if (e.username === undefined || e.password === undefined) continue;
+    const key = `${e.username}\u0000${e.password}`;
+    const cur = pairMap.get(key) ?? { user: e.username, pass: e.password, count: 0, worked: false };
+    cur.count += 1;
+    if (e.success) cur.worked = true;
+    pairMap.set(key, cur);
+  }
+  const pairs = [...pairMap.values()].sort((a, b) => b.count - a.count).slice(0, 6);
+
+  const funnel = [
+    { label: "Connected", note: "every tracked session", count: sessions.length, color: "#8ba3c7" },
+    { label: "Tried to log in", note: "sent a username and password", count: sessions.filter((s) => s.logins.length > 0).length, color: "#e5a93d" },
+    { label: "Got in", note: "a login worked on a decoy shell", count: breached.length, color: "#ec8b3c" },
+    { label: "Ran commands", note: "typed something in the shell", count: sessions.filter((s) => s.commands.length > 0).length, color: "#f0616d" },
+  ];
+
   return (
     <div className="mx-auto max-w-7xl space-y-6">
       <AutoRefresh seconds={30} />
-      <PageHeader title="Overview" subtitle="Activity across all decoys. Times are UTC and the data refreshes by itself.">
+      <PageHeader title="Overview" subtitle="Times are UTC. The page refreshes by itself.">
         <p className="text-xs text-faint">Updated {formatTime(new Date())} UTC</p>
       </PageHeader>
+
+      <p className="max-w-3xl text-base text-muted">
+        {stats.total === 0 ? (
+          "Nothing has touched the decoys yet."
+        ) : (
+          <>
+            So far the decoys captured <span className="text-fg">{formatNumber(stats.total)}</span> events from <span className="text-fg">{formatNumber(attackers.length)}</span> {attackers.length === 1 ? "attacker" : "attackers"}.
+            {busiest && <> The most active is <span className="font-mono text-fg">{busiest.src_ip}</span> with {formatNumber(busiest.events)} events, last seen {relativeTime(busiest.last_seen, now)}.</>}
+          </>
+        )}
+      </p>
 
       {(breached.length > 0 || scanners.length > 0) && (
         <Link
@@ -91,11 +143,64 @@ export default async function OverviewPage() {
       )}
 
       <div className="grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-line bg-line lg:grid-cols-5">
-        <StatCell href="/dashboard/decoys" label="Events captured" value={formatNumber(stats.total)} note={`${stats.by_decoy.length} decoys reporting`} />
-        <StatCell href="/dashboard/attackers" label="Attackers" value={formatNumber(attackers.length)} note="unique source IPs" />
+        <StatCell href="/dashboard/decoys" label="Events captured" value={formatNumber(stats.total)} note={`${formatNumber(todayCount)} today, ${stats.by_decoy.length} decoys reporting`} />
+        <StatCell href="/dashboard/attackers" label="Attackers" value={formatNumber(attackers.length)} note={`${active24} active in the last 24 hours`} />
         <StatCell href="/dashboard/sessions" label="Sessions" value={formatNumber(sessions.length)} note="tracked connections" />
         <StatCell href="/dashboard/sessions?login=success" label="Logins that worked" value={formatNumber(breached.length)} note="got into a decoy shell" alert={breached.length > 0} />
         <StatCell href="/dashboard/mitre" label="ATT&CK techniques" value={formatNumber(techniques.size)} note="distinct techniques seen" className="col-span-2 lg:col-span-1" />
+      </div>
+
+      <div className="grid gap-6 xl:grid-cols-3">
+        <Panel title="Events per day" hint={`${formatDay(days[0].day)} to ${formatDay(days[days.length - 1].day)}`} className="xl:col-span-2">
+          {stats.total === 0 ? <Empty title="No events yet">They appear here as soon as something touches a decoy.</Empty> : <DayBars days={days} dayDecoys={stats.by_day_decoy} />}
+        </Panel>
+
+        <Panel title="Needs attention" hint="open each one" flush>
+          <div className="flex h-full flex-col">
+            {breached.length === 0 && scanners.length === 0 && heavy.length === 0 ? (
+              <Empty title="Nothing to review">No login has worked on a decoy shell, no attacker probed several decoys, and nobody is sending heavy traffic.</Empty>
+            ) : (
+              <ul className="divide-y divide-line">
+                {breached.slice(0, 4).map((s) => (
+                  <li key={s.session}>
+                    <Link href={`/dashboard/sessions/${encodeURIComponent(s.session)}`} className={rowLink}>
+                      <div className="min-w-0">
+                        <div className="text-sm">Logged in as <span className="font-mono">{visible(s.logins.find((l) => l.success)?.username ?? "unknown")}</span></div>
+                        <div className="mt-1 text-xs text-faint">{decoyLabel(s.decoy)}, <span className="font-mono">{s.src_ip}</span>, {s.commands.length} {s.commands.length === 1 ? "command" : "commands"}, {relativeTime(s.start, now)}</div>
+                      </div>
+                      <Severity level="High" />
+                    </Link>
+                  </li>
+                ))}
+                {scanners.slice(0, 3).map((a) => (
+                  <li key={a.src_ip}>
+                    <Link href={`/dashboard/attackers/${encodeURIComponent(a.src_ip)}`} className={rowLink}>
+                      <div className="min-w-0">
+                        <div className="text-sm">Probed {a.decoys.length} decoys</div>
+                        <div className="mt-1 text-xs text-faint"><span className="font-mono">{a.src_ip}</span>, last seen {relativeTime(a.last_seen, now)}</div>
+                      </div>
+                      <Severity level="Medium" />
+                    </Link>
+                  </li>
+                ))}
+                {heavy.slice(0, 3).map((a) => (
+                  <li key={a.src_ip}>
+                    <Link href={`/dashboard/attackers/${encodeURIComponent(a.src_ip)}`} className={rowLink}>
+                      <div className="min-w-0">
+                        <div className="text-sm">Sent {formatNumber(a.events)} events</div>
+                        <div className="mt-1 text-xs text-faint"><span className="font-mono">{a.src_ip}</span>, {a.decoys.length} of {stats.by_decoy.length} decoys, last seen {relativeTime(a.last_seen, now)}</div>
+                      </div>
+                      <Severity level="Medium" />
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <p className="mt-auto border-t border-line px-4 py-3 text-xs leading-relaxed text-faint">
+              Listed when a login worked on a decoy shell, an attacker probed several decoys, or one address sent {HEAVY_EVENTS} or more events.
+            </p>
+          </div>
+        </Panel>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
@@ -116,38 +221,15 @@ export default async function OverviewPage() {
         </Panel>
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-3">
-        <Panel title="Events per day" hint={`${formatDay(days[0].day)} to ${formatDay(days[days.length - 1].day)}`} className="xl:col-span-2">
-          {stats.total === 0 ? <Empty title="No events yet">They appear here as soon as something touches a decoy.</Empty> : <DayBars days={days} dayDecoys={stats.by_day_decoy} />}
+      <div className="grid gap-6 lg:grid-cols-3">
+        <Panel title="How far attackers got" hint="sessions">
+          {sessions.length === 0 ? <Empty title="No session yet" /> : <Funnel steps={funnel} />}
         </Panel>
-
-        <Panel title="Needs attention" hint="open each one" flush>
-          {breached.length === 0 && scanners.length === 0 ? (
-            <Empty title="Nothing to review">No attacker has logged in to a decoy shell, and none has probed several decoys at once.</Empty>
-          ) : (
-            <ul className="divide-y divide-line">
-              {breached.slice(0, 4).map((s) => (
-                <li key={s.session}>
-                  <Link href={`/dashboard/sessions/${encodeURIComponent(s.session)}`} className={rowLink}>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2 text-sm"><span className="size-2 rounded-full bg-danger" />Logged in as <span className="font-mono">{visible(s.logins.find((l) => l.success)?.username ?? "unknown")}</span></div>
-                      <div className="mt-1 text-xs text-faint">{decoyLabel(s.decoy)}, <span className="font-mono">{s.src_ip}</span>, {s.commands.length} {s.commands.length === 1 ? "command" : "commands"}, {relativeTime(s.start, now)}</div>
-                    </div>
-                  </Link>
-                </li>
-              ))}
-              {scanners.slice(0, 3).map((a) => (
-                <li key={a.src_ip}>
-                  <Link href={`/dashboard/attackers/${encodeURIComponent(a.src_ip)}`} className={rowLink}>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2 text-sm"><span className="size-2 rounded-full bg-warn" />Probed {a.decoys.length} decoys</div>
-                      <div className="mt-1 text-xs text-faint"><span className="font-mono">{a.src_ip}</span>, last seen {relativeTime(a.last_seen, now)}</div>
-                    </div>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
+        <Panel title="When attacks happen" hint="hour of day, UTC">
+          <HourHeat hours={hours} sample={events.length} />
+        </Panel>
+        <Panel title="Logins tried together" hint="username / password" flush>
+          <CredentialPairs pairs={pairs} />
         </Panel>
       </div>
 
@@ -220,13 +302,21 @@ export default async function OverviewPage() {
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="font-mono text-sm">{a.src_ip}</span>
                           {a.behaviours.some((b) => b.id === "T1595") && <ScannerBadge />}
+                          {isPrivateIp(a.src_ip) && <span className="rounded border border-line-strong px-1.5 py-0.5 text-[11px] text-faint" title="This address is inside the test cluster network, not on the internet">internal</span>}
                         </div>
                         <span className="text-sm tabular-nums">{formatNumber(a.events)}</span>
                       </div>
                       <div className="h-1 rounded-sm bg-line">
                         <div className="h-full rounded-sm bg-info" style={{ width: `${Math.max(4, (a.events / maxAttacker) * 100)}%` }} />
                       </div>
-                      <div className="text-xs text-faint">{a.decoys.length} of {stats.by_decoy.length} decoys, last seen {relativeTime(a.last_seen, now)}</div>
+                      <div className="flex items-center gap-2 text-xs text-faint">
+                        <span className="flex items-center gap-1" aria-hidden="true">
+                          {stats.by_decoy.map((d) => (
+                            <span key={d.value} className="size-2 rounded-full" style={{ background: decoyColor(d.value), opacity: a.decoys.includes(d.value) ? 1 : 0.2 }} />
+                          ))}
+                        </span>
+                        {a.decoys.length} of {stats.by_decoy.length} decoys, last seen {relativeTime(a.last_seen, now)}
+                      </div>
                     </Link>
                   </li>
                 ))}

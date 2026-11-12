@@ -24,6 +24,9 @@ export default async function SessionDetailPage({ params }: { params: Promise<{ 
 
   if (!session) notFound();
 
+  const duration = session.duration_s ?? 0;
+  const techniques = session.techniques ?? [];
+
   return (
     <div className="mx-auto max-w-7xl space-y-6">
       <PageHeader
@@ -38,7 +41,7 @@ export default async function SessionDetailPage({ params }: { params: Promise<{ 
       <div className="grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-line bg-line lg:grid-cols-4">
         <StatCell label="Decoy Target" value={session.decoy} note={session.login_success ? "Authentication Access Granted" : "Auth Failed / Probed"} />
         <StatCell label="Attacker IP" value={session.src_ip} note="Click to view IP profile" href={`/dashboard/attackers/${encodeURIComponent(session.src_ip)}`} />
-        <StatCell label="Session Duration" value={`${session.duration_s}s`} note={`Started ${formatTime(session.start)}`} />
+        <StatCell label="Session Duration" value={`${duration}s`} note={`Started ${formatTime(session.start)}`} />
         <StatCell label="Commands Captured" value={formatNumber(session.commands.length)} note={`${session.logins.length} login attempts`} />
       </div>
 
@@ -70,21 +73,24 @@ export default async function SessionDetailPage({ params }: { params: Promise<{ 
           <Empty title="No shell commands executed during this session" />
         ) : (
           <div className="divide-y divide-line font-mono text-sm">
-            {session.commands.map((cmd, idx) => (
-              <div key={idx} className="flex items-center gap-4 px-4 py-3 hover:bg-surface-2">
-                <span className="text-xs text-faint tabular-nums">#{idx + 1}</span>
-                <span className="text-brand">$</span>
-                <span className="flex-1 text-fg select-all">{visible(cmd)}</span>
-              </div>
-            ))}
+            {session.commands.map((cmd, idx) => {
+              const cmdText = typeof cmd === "string" ? cmd : cmd.command;
+              return (
+                <div key={idx} className="flex items-center gap-4 px-4 py-3 hover:bg-surface-2">
+                  <span className="text-xs text-faint tabular-nums">#{idx + 1}</span>
+                  <span className="text-brand">$</span>
+                  <span className="flex-1 text-fg select-all">{visible(cmdText)}</span>
+                </div>
+              );
+            })}
           </div>
         )}
       </Panel>
 
-      {session.techniques.length > 0 && (
+      {techniques.length > 0 && (
         <Panel title="Matched ATT&CK Techniques">
           <div className="flex flex-wrap gap-2">
-            {session.techniques.map((t) => (
+            {techniques.map((t) => (
               <TechniqueChip key={t.id} id={t.id} name={t.name} />
             ))}
           </div>

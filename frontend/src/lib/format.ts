@@ -37,6 +37,14 @@ export function fillDays(rows: { day: string; count: number }[], days: number, t
 }
 
 /** Attacker text is only ever shown as plain text. Control characters (like terminal escape codes) are made visible, never run. */
-export function visible(s: string): string {
-  return s.replace(/[\u0000-\u001f\u007f]/g, (c) => `\\x${c.charCodeAt(0).toString(16).padStart(2, "0")}`);
+export function visible(s: string | null | undefined): string { return (s ?? "").replace(/[\u0000-\u001f\u007f]/g, (c) => `\\x${c.charCodeAt(0).toString(16).padStart(2, "0")}`);
+}
+
+/** True for addresses that live inside a private network (the test cluster), not on the internet. */
+export function isPrivateIp(ip: string): boolean {
+  const m = /^(\d{1,3})\.(\d{1,3})\.\d{1,3}\.\d{1,3}$/.exec(ip);
+  if (!m) return false;
+  const a = Number(m[1]);
+  const b = Number(m[2]);
+  return a === 10 || a === 127 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168);
 }

@@ -1,4 +1,4 @@
-﻿export type Counted = { value: string; count: number };
+export type Counted = { value: string; count: number };
 
 export type DayPoint = { day: string; count: number };
 export type DayDecoyPoint = { day: string; decoy: string; count: number };
@@ -47,13 +47,24 @@ export type Session = {
   src_ip: string;
   start: string;
   end: string;
+  duration_s?: number;
+  events?: number;
   login_success: boolean;
-  logins: { username: string; password?: string; success: boolean; time: string }[];
-  commands: { command: string; time: string }[];
+  logins: { username: string; password?: string; success: boolean; time?: string }[];
+  commands: (string | { command: string; time?: string })[];
+  techniques?: { id: string; name: string; tactics: string[]; events?: number }[];
 };
+
+export type Role = "admin" | "analyst";
 
 export type User = {
   username: string;
-  role: "admin" | "analyst";
+  role: Role;
   must_change_password?: boolean;
+  created_at?: string;
+  last_login?: string | null;
 };
+
+export type PendingRequest = { username: string; reason: string; created_at: string };
+
+export type AuditRow = { time: string; actor: string; action: string; target: string; detail: string | null };

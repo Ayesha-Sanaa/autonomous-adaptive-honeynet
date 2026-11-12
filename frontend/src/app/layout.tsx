@@ -4,7 +4,7 @@ import { GeistMono } from "geist/font/mono";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: { default: "Honeynet", template: "%s | Honeynet" },
+  title: { default: "Guardnet", template: "%s | Guardnet" },
   description: "Autonomous Adaptive Honeynet: attacker activity mapped to MITRE ATT&CK.",
   robots: { index: false, follow: false },
 };

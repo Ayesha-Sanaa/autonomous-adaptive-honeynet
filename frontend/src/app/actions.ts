@@ -2,7 +2,7 @@
 
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { apiLogin, apiLogout } from "@/lib/api";
+import { apiLogin, apiLogout, apiSignup } from "@/lib/api";
 import { COOKIE, getToken } from "@/lib/session";
 
 export type LoginState = { error: string | null; username: string };
@@ -48,4 +48,21 @@ export async function toggleDemoMode(enabled: boolean) {
     c.delete("demo_mode");
   }
   redirect("/dashboard");
+}
+
+export type SignupState = { error: string | null; done: boolean; username: string; reason: string };
+
+export async function signup(_prev: SignupState, form: FormData): Promise<SignupState> {
+  const username = String(form.get("username") ?? "").trim();
+  const password = String(form.get("password") ?? "");
+  const again = String(form.get("again") ?? "");
+  const reason = String(form.get("reason") ?? "").trim().slice(0, 200);
+  const fail = (error: string): SignupState => ({ error, done: false, username, reason });
+
+  if (!username || !password) return fail("Enter a username and a password.");
+  if (password !== again) return fail("The two passwords do not match.");
+
+  const result = await apiSignup({ username, password, reason });
+  if (!result.ok) return fail(result.error);
+  return { error: null, done: true, username: "", reason: "" };
 }

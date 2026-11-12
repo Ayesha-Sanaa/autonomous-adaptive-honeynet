@@ -13,6 +13,10 @@ const LOCK_MINUTES = 15;
 const MIN_PASSWORD = 12;
 const MAX_PASSWORD = 128;
 const ROLES = ["admin", "analyst"];
+const MAX_PENDING = 50; // account requests waiting for an admin
+const REQUEST_DAYS = 14; // an unanswered request is deleted after this many days
+const SIGNUPS_PER_HOUR = 10; // across everyone: the website calls the API from one address, so this is one shared limit
+const recentSignups = [];
 
 class HttpError extends Error {
   constructor(status, message) {
@@ -63,6 +67,13 @@ function checkPassword(password, username) {
 async function ensureIndexes(db) {
   await db.collection("sessions").createIndex({ expires_at: 1 }, { expireAfterSeconds: 0 }); // Mongo deletes expired sessions itself
   await db.collection("sessions").createIndex({ username: 1 });
+  await db.collection("signup_requests").createIndex({ expires_at: 1 }, { expireAfterSeconds: 0 });
+  await db.collection("audit").createIndex({ time: -1 });
+}
+
+// A short record of what admins did, so nothing about accounts changes silently.
+async function audit(db, actor, action, target, detail = null) {
+  await db.collection("audit").insertOne({ time: new Date(), actor, action, target, detail });
 }
 
 async function createUser(db, { username, password, role }) {
@@ -142,6 +153,83 @@ async function deleteUser(db, actor, username) {
   }
   await db.collection("users").deleteOne({ _id: u });
   await db.collection("sessions").deleteMany({ username: u });
+  await audit(db, actor, "removed user", u, target.role);
 }
 
-module.exports = { HttpError, ROLES, ensureIndexes, hashPassword, verifyPassword, createUser, login, sessionUser, logout, changePassword, listUsers, deleteUser };
+// Anyone can ask for an account. It cannot sign in until an admin approves it.
+// A taken username gets the same answer as a free one, so this cannot be used to find out who has an account.
+async function requestSignup(db, { username, password, reason }) {
+  const now = Date.now();
+  while (recentSignups.length && recentSignups[0] < now - 3600000) recentSignups.shift();
+  if (recentSignups.length >= SIGNUPS_PER_HOUR) throw new HttpError(429, "too many requests right now, try again later");
+  recentSignups.push(now);
+
+  const u = checkUsername(username);
+  const pw = checkPassword(password, u);
+  const note = String(reason ?? "").trim().slice(0, 200);
+  const requests = db.collection("signup_requests");
+  if ((await requests.countDocuments()) >= MAX_PENDING) throw new HttpError(429, "too many requests are waiting, ask an admin to clear them");
+
+  const hash = await hashPassword(pw); // always hashed, so the answer takes the same time either way
+  if (await db.collection("users").findOne({ _id: u }, { projection: { _id: 1 } })) return;
+  try {
+    await requests.insertOne({ _id: u, password: hash, reason: note, created_at: new Date(), expires_at: new Date(now + REQUEST_DAYS * 86400000) });
+  } catch (err) {
+    if (err.code !== 11000) throw err; // already waiting: nothing to do
+  }
+}
+
+async function listRequests(db) {
+  const docs = await db.collection("signup_requests").find({}, { projection: { password: 0 } }).sort({ created_at: 1 }).toArray();
+  return docs.map((d) => ({ username: d._id, reason: d.reason || "", created_at: d.created_at }));
+}
+
+async function approveRequest(db, actor, username, role) {
+  const u = checkUsername(username);
+  if (!ROLES.includes(role)) throw new HttpError(400, `role must be one of: ${ROLES.join(", ")}`);
+  const requests = db.collection("signup_requests");
+  const request = await requests.findOne({ _id: u });
+  if (!request) throw new HttpError(404, "no such request");
+  try {
+    await db.collection("users").insertOne({ _id: u, password: request.password, role, created_at: new Date(), failed_logins: 0, locked_until: null, approved_by: actor });
+  } catch (err) {
+    if (err.code === 11000) {
+      await requests.deleteOne({ _id: u });
+      throw new HttpError(409, "that username already exists");
+    }
+    throw err;
+  }
+  await requests.deleteOne({ _id: u });
+  await audit(db, actor, "approved account", u, role);
+  return { username: u, role };
+}
+
+async function rejectRequest(db, actor, username) {
+  const u = checkUsername(username);
+  const { deletedCount } = await db.collection("signup_requests").deleteOne({ _id: u });
+  if (!deletedCount) throw new HttpError(404, "no such request");
+  await audit(db, actor, "rejected request", u);
+}
+
+// The role is read from the database on every request, so a change takes effect immediately.
+async function setRole(db, actor, username, role) {
+  const u = checkUsername(username);
+  if (!ROLES.includes(role)) throw new HttpError(400, `role must be one of: ${ROLES.join(", ")}`);
+  if (u === actor) throw new HttpError(400, "you cannot change your own role");
+  const target = await db.collection("users").findOne({ _id: u });
+  if (!target) throw new HttpError(404, "no such user");
+  if (target.role === role) return { username: u, role };
+  await db.collection("users").updateOne({ _id: u }, { $set: { role } });
+  await audit(db, actor, "changed role", u, `${target.role} to ${role}`);
+  return { username: u, role };
+}
+
+async function listAudit(db, limit = 20) {
+  const docs = await db.collection("audit").find({}).sort({ time: -1 }).limit(limit).toArray();
+  return docs.map((d) => ({ time: d.time, actor: d.actor, action: d.action, target: d.target, detail: d.detail || null }));
+}
+
+module.exports = {
+  HttpError, ROLES, ensureIndexes, hashPassword, verifyPassword, createUser, login, sessionUser, logout, changePassword,
+  listUsers, deleteUser, requestSignup, listRequests, approveRequest, rejectRequest, setRole, listAudit,
+};

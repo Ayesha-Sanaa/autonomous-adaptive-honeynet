@@ -1,77 +1,92 @@
-﻿import "server-only";
-import { cache } from "react";
-import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
-import { getToken } from "./session";
-import type { User } from "./types";
+import { COOKIE } from "./session";
 
-const API_URL = process.env.API_URL ?? "http://api:3001";
+const API_BASE = process.env.HONEYNET_API_URL || "http://localhost:3001";
 
-export class ApiError extends Error {
-  constructor(public status: number, message: string) {
-    super(message);
+export async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const cookieStore = await cookies();
+  const token = cookieStore.get(COOKIE)?.value;
+
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    ...(options.headers as Record<string, string>),
+  };
+
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
   }
+
+  // Pass demo mode cookie to backend as query parameter if set
+  const isDemo = cookieStore.get("demo_mode")?.value === "1";
+  let url = `${API_BASE}${path}`;
+  if (isDemo && !path.includes("data=demo")) {
+    url += path.includes("?") ? "&data=demo" : "?data=demo";
+  }
+
+  let res: Response;
+  try {
+    res = await fetch(url, { ...options, headers, cache: "no-store" });
+  } catch {
+    throw new Error("API unreachable");
+  }
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(err.error || `API request failed: ${res.status}`);
+  }
+
+  if (res.status === 204) return undefined as T;
+  const text = await res.text();
+  if (!text) throw new Error("API sent an empty answer");
+  return JSON.parse(text) as T;
 }
 
-async function call(path: string, init: RequestInit & { token?: string | null } = {}) {
-  const { token, ...rest } = init;
-  
-  // Demo mode cookie check
-  const isDemo = cookies().get("demo_mode")?.value === "1";
-  let finalPath = path;
-  
-  if (isDemo && (path.startsWith("/events") || path.startsWith("/stats") || path.startsWith("/attackers") || path.startsWith("/sessions"))) {
-    finalPath += path.includes("?") ? "&data=demo" : "?data=demo";
-  }
-
-  return fetch(API_URL + finalPath, {
-    ...rest,
+export async function apiLogin(username: string, password: string) {
+  const res = await fetch(`${API_BASE}/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username, password }),
     cache: "no-store",
-    signal: AbortSignal.timeout(8000),
-    headers: {
-      ...(rest.body ? { "Content-Type": "application/json" } : {}),
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
   });
+
+  if (!res.ok) {
+    if (res.status === 401) return { ok: false as const, reason: "invalid" as const };
+    return { ok: false as const, reason: "unreachable" as const };
+  }
+
+  const data = await res.json();
+  return { ok: true as const, token: data.token as string, expiresAt: data.expiresAt as string };
 }
 
-export async function api<T>(path: string): Promise<T> {
-  const res = await call(path, { token: await getToken() });
-  if (res.status === 401) redirect("/login");
-  if (!res.ok) throw new ApiError(res.status, `API ${path} answered ${res.status}`);
-  return res.json() as Promise<T>;
-}
-
-export const getCurrentUser = cache(async (): Promise<User | null> => {
-  const token = await getToken();
-  if (!token) return null;
+export async function apiSignup(body: { username: string; password: string; reason: string }) {
+  let res: Response;
   try {
-    const res = await call("/auth/me", { token });
-    if (!res.ok) return null;
-    return ((await res.json()) as { user: User }).user;
+    res = await fetch(`${API_BASE}/auth/signup`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      cache: "no-store",
+    });
   } catch {
-    return null;
+    return { ok: false as const, error: "Cannot reach the honeynet API right now. Try again in a moment." };
   }
-});
-
-export type LoginResult =
-  | { ok: true; token: string; expiresAt: string }
-  | { ok: false; reason: "invalid" | "unreachable" };
-
-export async function apiLogin(username: string, password: string): Promise<LoginResult> {
-  try {
-    const res = await call("/auth/login", { method: "POST", body: JSON.stringify({ username, password }) });
-    if (res.status === 401 || res.status === 400) return { ok: false, reason: "invalid" };
-    if (!res.ok) return { ok: false, reason: "unreachable" };
-    const data = (await res.json()) as { token: string; expires_at: string };
-    return { ok: true, token: data.token, expiresAt: data.expires_at };
-  } catch {
-    return { ok: false, reason: "unreachable" };
-  }
+  if (res.ok) return { ok: true as const };
+  const err = await res.json().catch(() => ({}));
+  return { ok: false as const, error: typeof err.error === "string" ? err.error : "The request could not be sent." };
 }
 
 export async function apiLogout(token: string) {
+  await fetch(`${API_BASE}/auth/logout`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    cache: "no-store",
+  }).catch(() => {});
+}
+
+export async function getCurrentUser() {
   try {
-    await call("/auth/logout", { method: "POST", token });
-  } catch {}
+    const data = await api<{ user: { username: string; role: "admin" | "analyst"; must_change_password?: boolean } }>("/auth/me");
+    return data.user;
+  } catch {
+    return null;
+  }
 }
