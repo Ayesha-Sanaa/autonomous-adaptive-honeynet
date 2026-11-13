@@ -1,0 +1,37 @@
+﻿{
+  "version": "1.0.0",
+  "total_features": 25,
+  "actions": [
+    "maintain",
+    "escalate_tier",
+    "plant_breadcrumb",
+    "observe_only"
+  ],
+  "features": [
+    { "index": 0, "name": "session_duration_s", "type": "float", "range": [0, 86400], "description": "Session kitni der chali hai seconds mein." },
+    { "index": 1, "name": "total_events_count", "type": "integer", "range": [0, 10000], "description": "Is session/IP ke kul kitnay events record huay." },
+    { "index": 2, "name": "event_rate_per_min", "type": "float", "range": [0, 600], "description": "Events per minute." },
+    { "index": 3, "name": "time_since_last_event_s", "type": "float", "range": [0, 3600], "description": "Aakhri event se ab tak kitna waqt guzra." },
+    { "index": 4, "name": "is_active_session", "type": "binary", "range": [0, 1], "description": "Session active hai (1) ya closed (0)." },
+    { "index": 5, "name": "login_attempts_count", "type": "integer", "range": [0, 1000], "description": "Kul login koshishein." },
+    { "index": 6, "name": "distinct_usernames_count", "type": "integer", "range": [0, 500], "description": "Kitnay mukhtalif usernames aazmaye." },
+    { "index": 7, "name": "distinct_passwords_count", "type": "integer", "range": [0, 500], "description": "Kitnay mukhtalif passwords try kiye." },
+    { "index": 8, "name": "login_success_flag", "type": "binary", "range": [0, 1], "description": "Kya koi login kamyab hua (1 ya 0)." },
+    { "index": 9, "name": "credential_repetition_ratio", "type": "float", "range": [0, 1], "description": "Unique passwords / total attempts." },
+    { "index": 10, "name": "commands_count", "type": "integer", "range": [0, 1000], "description": "Cowrie shell mein total commands." },
+    { "index": 11, "name": "distinct_commands_count", "type": "integer", "range": [0, 500], "description": "Total unique commands." },
+    { "index": 12, "name": "recon_commands_count", "type": "integer", "range": [0, 200], "description": "Recon commands (whoami, uname, ps)." },
+    { "index": 13, "name": "download_attempts_count", "type": "integer", "range": [0, 50], "description": "Download commands (wget, curl, tftp)." },
+    { "index": 14, "name": "evasion_commands_count", "type": "integer", "range": [0, 50], "description": "Stealth commands (history -c)." },
+    { "index": 15, "name": "decoys_touched_count", "type": "integer", "range": [1, 4], "description": "Kitnay decoys touch kiye (1 se 4)." },
+    { "index": 16, "name": "protocols_touched_count", "type": "integer", "range": [1, 5], "description": "Kitnay protocols use kiye." },
+    { "index": 17, "name": "touches_cowrie", "type": "binary", "range": [0, 1], "description": "Cowrie SSH/Telnet touch hua (1 ya 0)." },
+    { "index": 18, "name": "touches_web_portal", "type": "binary", "range": [0, 1], "description": "Web admin portal touch hua (1 ya 0)." },
+    { "index": 19, "name": "touches_dionaea_or_heralding", "type": "binary", "range": [0, 1], "description": "SMB ya FTP decoy touch hua (1 ya 0)." },
+    { "index": 20, "name": "unique_mitre_techniques_count", "type": "integer", "range": [0, 20], "description": "Unique MITRE techniques trigger huin." },
+    { "index": 21, "name": "mitre_tactics_count", "type": "integer", "range": [0, 10], "description": "ATT&CK tactics count." },
+    { "index": 22, "name": "high_confidence_attacks_count", "type": "integer", "range": [0, 50], "description": "High confidence attacks (/etc/shadow)." },
+    { "index": 23, "name": "is_scanner_flag", "type": "binary", "range": [0, 1], "description": "T1595 active scanner detect hua (1 ya 0)." },
+    { "index": 24, "name": "threat_depth_score", "type": "float", "range": [0, 10], "description": "Overall attack stage score (0 se 10)." }
+  ]
+}

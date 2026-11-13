@@ -23,6 +23,8 @@ spec:
           env:
             - name: MONGO_URL
               value: mongodb://mongodb:27017
+            - name: SIDECAR_URL
+              value: http://rl-sidecar:5000
 ---
 apiVersion: v1
 kind: Service

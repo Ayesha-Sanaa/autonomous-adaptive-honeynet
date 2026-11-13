@@ -182,6 +182,31 @@ function buildServer(db) {
 
       const isDemo = url.searchParams.get("data") === "demo";
       const baseFilter = isDemo ? { synthetic: true } : { synthetic: { $ne: true } };
+      if (path === "/adaptive/decisions" && method === "GET") {
+        const limit = Math.min(Number(url.searchParams.get("limit")) || 50, 100);
+        const docs = await db.collection("adaptive_decisions").find({}).sort({ timestamp: -1 }).limit(limit).toArray();
+        return send(res, 200, docs);
+      }
+
+      if (path === "/adaptive/stats" && method === "GET") {
+        const total = await db.collection("adaptive_decisions").countDocuments({});
+        const actions = await db.collection("adaptive_decisions").aggregate([
+          { $group: { _id: "$action", count: { $sum: 1 } } }
+        ]).toArray();
+        const actionCounts = { maintain: 0, escalate_tier: 0, plant_breadcrumb: 0, observe_only: 0 };
+        for (const a of actions) {
+          if (a._id in actionCounts) actionCounts[a._id] = a.count;
+        }
+        const fallbackCount = await db.collection("adaptive_decisions").countDocuments({ fallback: true });
+        const latest = await db.collection("adaptive_decisions").findOne({}, { sort: { timestamp: -1 } });
+        return send(res, 200, {
+          total,
+          by_action: actionCounts,
+          fallback_count: fallbackCount,
+          latest_decision: latest ? latest.timestamp : null,
+        });
+      }
+
 
       if (path === "/events") {
         const filter = { ...baseFilter };
@@ -275,3 +300,4 @@ async function main() {
 if (require.main === module) main();
 
 module.exports = { buildServer };
+
