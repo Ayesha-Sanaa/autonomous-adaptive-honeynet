@@ -1,5 +1,6 @@
 FROM node:alpine
 WORKDIR /app
-COPY package.json ./
+COPY backend/package.json ./
 RUN npm install --omit=dev
-COPY src ./
+COPY backend/src ./
+COPY rl/features.json /rl/features.json

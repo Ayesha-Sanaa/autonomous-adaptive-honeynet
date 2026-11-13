@@ -4,8 +4,7 @@ cd /d "%~dp0"
 docker info >nul 2>&1 || (echo Docker Desktop is not running. Start it and try again. & exit /b 1)
 
 echo [1/5] Building backend image
-docker build -t honeynet-backend:dev backend || exit /b 1
-
+docker build -t honeynet-backend:dev -f backend/Dockerfile . || exit /b 1
 echo [2/5] Building RL sidecar image
 docker build -t honeynet-rl:dev -f rl/sidecar/Dockerfile rl || exit /b 1
 

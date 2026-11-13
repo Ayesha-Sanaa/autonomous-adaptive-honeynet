@@ -3,6 +3,9 @@ const { mapAttack } = require("./mitre");
 const crypto = require("crypto");
 const { MongoClient } = require("mongodb");
 const { parseCsvLine } = require("./records");
+const { evaluateAndDecide } = require("./adaptive");
+
+let db = null;
 
 const MONGO_URL = process.env.MONGO_URL || "mongodb://mongodb:27017";
 const LOG_DIR = process.env.LOG_DIR || "/logs";
@@ -23,6 +26,22 @@ function toRecord(src, line) {
   }
   const values = parseCsvLine(line);
   return Object.fromEntries(src.header.map((h, i) => [h, values[i] ?? ""]));
+}
+
+async function decideForClosedSessions(docs) {
+  for (const d of docs) {
+    if (d.event_type !== "session_end" || !d.session) continue;
+    try {
+      const done = await db
+        .collection("adaptive_decisions")
+        .findOne({ session: d.session }, { projection: { _id: 1 } });
+      if (done) continue;
+      const decision = await evaluateAndDecide(db, { session: d.session, src_ip: d.src_ip });
+      console.log(`adaptive: session ${d.session} -> ${decision.action}`);
+    } catch (err) {
+      console.error(`adaptive: ${err.message}`);
+    }
+  }
 }
 
 async function poll(src, events) {
@@ -57,19 +76,22 @@ async function poll(src, events) {
       bad++;
     }
   }
+
   if (docs.length > 0) {
-  await events.bulkWrite(
-    docs.map(({ _id, ...d }) => ({ updateOne: { filter: { _id }, update: { $set: d }, upsert: true } })),
-    { ordered: false }
-  );
-}
+    await events.bulkWrite(
+      docs.map(({ _id, ...d }) => ({ updateOne: { filter: { _id }, update: { $set: d }, upsert: true } })),
+      { ordered: false }
+    );
+    await decideForClosedSessions(docs);
+  }
   console.log(`${src.decoy}: ${docs.length} events processed, ${bad} unparseable`);
 }
 
 (async () => {
   const client = new MongoClient(MONGO_URL);
   await client.connect();
-  const events = client.db("honeynet").collection("events");
+  db = client.db("honeynet");
+  const events = db.collection("events");
   await events.createIndex({ timestamp: 1 });
   await events.createIndex({ src_ip: 1 });
   await events.createIndex({ session: 1 });
