@@ -29,7 +29,6 @@ def resolve_path(var, name):
     return name
 MODEL_PATH = resolve_path('MODEL_PATH', 'ppo_honeynet.onnx')
 FEATURES_PATH = resolve_path('FEATURES_PATH', 'features.json')
-FEATURES_PATH = os.environ.get("FEATURES_PATH", "features.json")
 
 ACTIONS = ["maintain", "escalate_tier", "plant_breadcrumb", "observe_only"]
 FALLBACK_ACTION = "maintain"
