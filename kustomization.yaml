@@ -9,6 +9,7 @@ resources:
   - backend/deploy/collector.yaml
   - backend/deploy/api.yaml
   - rl/deploy/sidecar.yaml
+  - haproxy/haproxy.yaml
 configMapGenerator:
   - name: backend-code
     namespace: honeynet
@@ -27,3 +28,8 @@ configMapGenerator:
     namespace: honeynet
     files:
      - decoys/dionaea/log_json.yaml   
+
+  - name: haproxy-config
+    namespace: honeynet
+    files:
+      - haproxy/haproxy.cfg   

@@ -39,10 +39,9 @@ metadata:
   name: web-portal
   namespace: honeynet
 spec:
-  type: NodePort
+  type: ClusterIP
   selector:
     app: web-portal
   ports:
     - port: 80
       targetPort: 80
-      nodePort: 30080

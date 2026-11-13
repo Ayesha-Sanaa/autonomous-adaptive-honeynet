@@ -1,0 +1,63 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: haproxy
+  namespace: honeynet
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: haproxy
+  template:
+    metadata:
+      labels:
+        app: haproxy
+    spec:
+      containers:
+        - name: haproxy
+          image: haproxy:lts-alpine
+          ports:
+            - containerPort: 2222
+            - containerPort: 8080
+            - containerPort: 2121
+            - containerPort: 2323
+            - containerPort: 4445
+          volumeMounts:
+            - name: config
+              mountPath: /usr/local/etc/haproxy
+              readOnly: true
+      volumes:
+        - name: config
+          configMap:
+            name: haproxy-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: haproxy
+  namespace: honeynet
+spec:
+  type: NodePort
+  selector:
+    app: haproxy
+  ports:
+    - name: ssh
+      port: 2222
+      targetPort: 2222
+      nodePort: 30222
+    - name: web
+      port: 8080
+      targetPort: 8080
+      nodePort: 30080
+    - name: ftp
+      port: 2121
+      targetPort: 2121
+      nodePort: 30121
+    - name: telnet
+      port: 2323
+      targetPort: 2323
+      nodePort: 30123
+    - name: smb
+      port: 4445
+      targetPort: 4445
+      nodePort: 30445

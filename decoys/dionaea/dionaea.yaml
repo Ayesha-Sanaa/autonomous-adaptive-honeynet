@@ -48,10 +48,9 @@ metadata:
   name: dionaea
   namespace: honeynet
 spec:
-  type: NodePort
+  type: ClusterIP
   selector:
     app: dionaea
   ports:
     - port: 445
       targetPort: 445
-      nodePort: 30445

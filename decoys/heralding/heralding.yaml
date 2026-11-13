@@ -38,15 +38,13 @@ metadata:
   name: heralding
   namespace: honeynet
 spec:
-  type: NodePort
+  type: ClusterIP
   selector:
     app: heralding
   ports:
     - name: ftp
       port: 21
       targetPort: 21
-      nodePort: 30121
     - name: telnet
       port: 23
       targetPort: 23
-      nodePort: 30123

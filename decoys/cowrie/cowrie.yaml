@@ -33,10 +33,9 @@ metadata:
   name: cowrie
   namespace: honeynet
 spec:
-  type: NodePort
+  type: ClusterIP
   selector:
     app: cowrie
   ports:
     - port: 2222
       targetPort: 2222
-      nodePort: 30222
