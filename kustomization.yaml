@@ -8,6 +8,7 @@ resources:
   - backend/deploy/mongodb.yaml
   - backend/deploy/collector.yaml
   - backend/deploy/api.yaml
+  - rl/deploy/sidecar.yaml
 configMapGenerator:
   - name: backend-code
     namespace: honeynet
