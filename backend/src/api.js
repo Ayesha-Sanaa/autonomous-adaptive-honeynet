@@ -2,6 +2,61 @@
 const { MongoClient } = require("mongodb");
 const { attackersPipeline, sessionsPipeline, shapeAttacker, shapeSession } = require("./analytics");
 const auth = require("./auth");
+const { CrdtState } = require("./crdt");
+
+const CRDT_PEERS = (process.env.CRDT_PEERS ||
+  "cowrie=http://cowrie-crdt:7000,web-portal=http://web-portal-crdt:7000,heralding=http://heralding-crdt:7000,dionaea=http://dionaea-crdt:7000")
+  .split(",")
+  .map((s) => s.trim().split("="))
+  .filter((p) => p.length === 2)
+  .map(([name, url]) => ({ name, url }));
+
+function getJson(url, timeoutMs = 2000) {
+  return new Promise((resolve, reject) => {
+    const req = http.get(url, { timeout: timeoutMs }, (res) => {
+      let body = "";
+      res.on("data", (c) => (body += c));
+      res.on("end", () => {
+        try { resolve(JSON.parse(body)); } catch (e) { reject(e); }
+      });
+    });
+    req.on("timeout", () => req.destroy(new Error("timeout")));
+    req.on("error", reject);
+  });
+}
+
+async function crdtOverview() {
+  const merged = new CrdtState("api");
+  const nodes = await Promise.all(
+    CRDT_PEERS.map(async ({ name, url }) => {
+      try {
+        const s = await getJson(`${url}/state`);
+        merged.merge(s);
+        return { name, up: true, ips: Object.keys(s.ips || {}).length };
+      } catch {
+        return { name, up: false, ips: 0 };
+      }
+    })
+  );
+  const ips = Object.entries(merged.toJSON().ips)
+    .map(([ip, r]) => ({
+      ip,
+      level: r.level,
+      last_seen: r.last ? new Date(r.last.ts).toISOString() : null,
+      last_decoy: r.last ? r.last.decoy : null,
+      decoys: Object.keys(r.counts),
+      total_events: Object.values(r.counts).reduce((a, b) => a + b, 0),
+    }))
+    .sort((a, b) => b.level - a.level || String(b.last_seen).localeCompare(String(a.last_seen)))
+    .slice(0, 200);
+  return {
+    nodes_total: nodes.length,
+    nodes_up: nodes.filter((n) => n.up).length,
+    nodes,
+    ips_total: ips.length,
+    ips,
+  };
+}
 
 const MONGO_URL = process.env.MONGO_URL || "mongodb://mongodb:27017";
 const PORT = Number(process.env.PORT || 3001);
@@ -179,7 +234,7 @@ function buildServer(db) {
         if (user.role !== "admin") return send(res, 403, { error: "admins only" });
         return send(res, 200, await auth.listAudit(db));
       }
-
+      if (path === "/crdt") return send(res, 200, await crdtOverview());
       const isDemo = url.searchParams.get("data") === "demo";
       const baseFilter = isDemo ? { synthetic: true } : { synthetic: { $ne: true } };
       if (path === "/adaptive/decisions" && method === "GET") {
