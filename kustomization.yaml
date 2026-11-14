@@ -30,6 +30,11 @@ configMapGenerator:
     files:
      - decoys/dionaea/log_json.yaml   
 
+  - name: cowrie-userdb
+    namespace: honeynet
+    files:
+      - userdb.txt=decoys/cowrie/userdb.txt
+
   - name: haproxy-config
     namespace: honeynet
     files:

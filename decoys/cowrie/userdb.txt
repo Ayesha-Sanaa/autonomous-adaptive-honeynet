@@ -1,0 +1,12 @@
+root:x:toor
+root:x:Passw0rd
+root:x:admin@123
+admin:x:admin
+admin:x:P@ssw0rd
+admin:x:Admin123
+ubuntu:x:ubuntu
+ubuntu:x:Welcome1
+pi:x:raspberry
+pi:x:raspberrypi
+user:x:user123
+test:x:test123

@@ -21,6 +21,10 @@ spec:
           volumeMounts:
             - name: logs
               mountPath: /cowrie/cowrie-git/var/log/cowrie
+            - name: userdb
+              mountPath: /cowrie/cowrie-git/etc/userdb.txt
+              subPath: userdb.txt
+              readOnly: true
         - name: crdt
           image: honeynet-backend:dev
           imagePullPolicy: Never
@@ -60,6 +64,9 @@ spec:
           hostPath:
             path: /logs
             type: Directory
+        - name: userdb
+          configMap:
+            name: cowrie-userdb
 ---
 apiVersion: v1
 kind: Service
