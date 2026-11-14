@@ -13,9 +13,22 @@ spec:
       labels:
         app: cowrie
     spec:
+      initContainers:
+        - name: build-fs
+          image: cowrie/cowrie:latest
+          command: ["python3", "/scripts/build-fs.py"]
+          volumeMounts:
+            - name: fs
+              mountPath: /fs
+            - name: fs-builder
+              mountPath: /scripts
+              readOnly: true
       containers:
         - name: cowrie
           image: cowrie/cowrie:latest
+          env:
+            - name: COWRIE_SHELL_FILESYSTEM
+              value: /fs/custom-fs.pickle
           ports:
             - containerPort: 2222
           volumeMounts:
@@ -24,6 +37,9 @@ spec:
             - name: userdb
               mountPath: /cowrie/cowrie-git/etc/userdb.txt
               subPath: userdb.txt
+              readOnly: true
+            - name: fs
+              mountPath: /fs
               readOnly: true
         - name: crdt
           image: honeynet-backend:dev
@@ -67,6 +83,11 @@ spec:
         - name: userdb
           configMap:
             name: cowrie-userdb
+        - name: fs
+          emptyDir: {}
+        - name: fs-builder
+          configMap:
+            name: cowrie-fs-builder
 ---
 apiVersion: v1
 kind: Service

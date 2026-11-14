@@ -34,6 +34,11 @@ configMapGenerator:
     namespace: honeynet
     files:
       - userdb.txt=decoys/cowrie/userdb.txt
+      
+  - name: cowrie-fs-builder
+    namespace: honeynet
+    files:
+      - build-fs.py=decoys/cowrie/build-fs.py    
 
   - name: haproxy-config
     namespace: honeynet
