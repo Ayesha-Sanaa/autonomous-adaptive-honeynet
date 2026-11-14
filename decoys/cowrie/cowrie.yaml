@@ -21,10 +21,44 @@ spec:
           volumeMounts:
             - name: logs
               mountPath: /cowrie/cowrie-git/var/log/cowrie
+        - name: crdt
+          image: honeynet-backend:dev
+          imagePullPolicy: Never
+          command: ["node", "crdt-sidecar.js"]
+          env:
+            - name: DECOY_NAME
+              value: cowrie
+            - name: PORT
+              value: "7000"
+            - name: LOG_FILE
+              value: /logs/cowrie/cowrie.json
+            - name: LOG_FORMAT
+              value: jsonl
+            - name: NORMALIZER
+              value: cowrie
+            - name: PEERS
+              value: http://web-portal-crdt:7000,http://heralding-crdt:7000,http://dionaea-crdt:7000
+          ports:
+            - containerPort: 7000
+          resources:
+            requests:
+              cpu: 20m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 128Mi
+          volumeMounts:
+            - name: alllogs
+              mountPath: /logs
+              readOnly: true
       volumes:
         - name: logs
           hostPath:
             path: /logs/cowrie
+            type: Directory
+        - name: alllogs
+          hostPath:
+            path: /logs
             type: Directory
 ---
 apiVersion: v1
@@ -39,3 +73,8 @@ spec:
   ports:
     - port: 2222
       targetPort: 2222
+
+
+
+
+

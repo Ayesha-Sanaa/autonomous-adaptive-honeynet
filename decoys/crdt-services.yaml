@@ -1,0 +1,47 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: cowrie-crdt
+  namespace: honeynet
+spec:
+  selector:
+    app: cowrie
+  ports:
+    - port: 7000
+      targetPort: 7000
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: web-portal-crdt
+  namespace: honeynet
+spec:
+  selector:
+    app: web-portal
+  ports:
+    - port: 7000
+      targetPort: 7000
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: heralding-crdt
+  namespace: honeynet
+spec:
+  selector:
+    app: heralding
+  ports:
+    - port: 7000
+      targetPort: 7000
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dionaea-crdt
+  namespace: honeynet
+spec:
+  selector:
+    app: dionaea
+  ports:
+    - port: 7000
+      targetPort: 7000
