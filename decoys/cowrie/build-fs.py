@@ -37,6 +37,13 @@ def add_file(parent, name, data, uid, gid, mode=0o100644, age=10, size=None):
     return node
 
 
+def ensure_path(root, parts, uid=0, gid=0):
+    node = root
+    for p in parts:
+        node = add_dir(node, p, uid, gid)
+    return node
+
+
 USERS = [("admin", 1001), ("ubuntu", 1002), ("pi", 1003), ("user", 1004), ("test", 1005)]
 
 # make the new users exist in /etc/passwd
@@ -79,6 +86,31 @@ tail -n 50 /var/log/syslog
 exit
 """
 
+SSHCFG = """Host db01
+    HostName 10.20.0.15
+    User backup
+Host nas01
+    HostName 10.20.0.30
+    User backupsvc
+Host jump
+    HostName 10.20.0.5
+    User admin
+"""
+
+KNOWN = "10.20.0.15 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPlaceholderHostKeyNotReal0000000000000000\n"
+
+APPCFG = """app:
+  name: inventory
+  port: 8081
+database:
+  host: 10.20.0.15
+  user: backup
+  password: B4ckup#2024
+  name: inventory
+"""
+
+CRON = "30 2 * * * admin /home/admin/backup.sh\n"
+
 for user, uid in USERS:
     h = add_dir(home, user, uid, uid, mode=0o40750, age=90)
     if user == "admin":
@@ -86,12 +118,21 @@ for user, uid in USERS:
         add_file(h, "backup.sh", BACKUP, uid, uid, mode=0o100755, age=19)
         add_file(h, "inventory-2024-10-28.sql.gz", b"", uid, uid, age=17, size=48213342)
         add_file(h, ".bash_history", HISTORY, uid, uid, mode=0o100600, age=1)
+        ssh = add_dir(h, ".ssh", uid, uid, mode=0o40700, age=70)
+        add_file(ssh, "config", SSHCFG, uid, uid, mode=0o100600, age=50)
+        add_file(ssh, "known_hosts", KNOWN, uid, uid, mode=0o100644, age=50)
     else:
         add_file(h, ".bash_history", "ls\nexit\n", uid, uid, mode=0o100600, age=40)
+
+app = ensure_path(fs, ["opt", "inventory-app"])
+add_file(app, "config.yml", APPCFG, 0, 0, mode=0o100644, age=25)
+cron = ensure_path(fs, ["etc", "cron.d"])
+add_file(cron, "backup", CRON, 0, 0, mode=0o100644, age=60)
 
 with open(DST, "wb") as f:
     pickle.dump(fs, f)
 
 print("custom fs written to", DST)
-print("/home:", [c[0] for c in home[7]])
 print("/home/admin:", [c[0] for c in child(home, "admin")[7]])
+print("/opt/inventory-app:", [c[0] for c in app[7]])
+print("/etc/cron.d:", [c[0] for c in cron[7]])
