@@ -18,18 +18,51 @@ spec:
           image: dtagdevsec/heralding:24.04.1
           ports:
             - containerPort: 21
-            - containerPort: 23
           volumeMounts:
             - name: tmp
               mountPath: /tmp/heralding
             - name: logs
               mountPath: /var/log/heralding
+        - name: crdt
+          image: honeynet-backend:dev
+          imagePullPolicy: Never
+          command: ["node", "crdt-sidecar.js"]
+          env:
+            - name: DECOY_NAME
+              value: heralding
+            - name: PORT
+              value: "7000"
+            - name: LOG_FILE
+              value: /logs/heralding/auth.csv
+            - name: LOG_FORMAT
+              value: csv
+            - name: NORMALIZER
+              value: heralding
+            - name: PEERS
+              value: http://cowrie-crdt:7000,http://web-portal-crdt:7000,http://dionaea-crdt:7000
+          ports:
+            - containerPort: 7000
+          resources:
+            requests:
+              cpu: 20m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 128Mi
+          volumeMounts:
+            - name: alllogs
+              mountPath: /logs
+              readOnly: true
       volumes:
         - name: tmp
           emptyDir: {}
         - name: logs
           hostPath:
             path: /logs/heralding
+            type: Directory
+        - name: alllogs
+          hostPath:
+            path: /logs
             type: Directory
 ---
 apiVersion: v1

@@ -27,8 +27,36 @@ spec:
               subPath: log_json.yaml
             - name: lib
               mountPath: /opt/dionaea/var/lib
-            - name: log
-              mountPath: /opt/dionaea/var/log
+        - name: crdt
+          image: honeynet-backend:dev
+          imagePullPolicy: Never
+          command: ["node", "crdt-sidecar.js"]
+          env:
+            - name: DECOY_NAME
+              value: dionaea
+            - name: PORT
+              value: "7000"
+            - name: LOG_FILE
+              value: /logs/dionaea/lib/dionaea/dionaea.json
+            - name: LOG_FORMAT
+              value: jsonl
+            - name: NORMALIZER
+              value: dionaea
+            - name: PEERS
+              value: http://cowrie-crdt:7000,http://web-portal-crdt:7000,http://heralding-crdt:7000
+          ports:
+            - containerPort: 7000
+          resources:
+            requests:
+              cpu: 20m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 128Mi
+          volumeMounts:
+            - name: alllogs
+              mountPath: /logs
+              readOnly: true
       volumes:
         - name: log-json
           configMap:
@@ -40,6 +68,10 @@ spec:
         - name: log
           hostPath:
             path: /logs/dionaea/log
+            type: Directory
+        - name: alllogs
+          hostPath:
+            path: /logs
             type: Directory
 ---
 apiVersion: v1
