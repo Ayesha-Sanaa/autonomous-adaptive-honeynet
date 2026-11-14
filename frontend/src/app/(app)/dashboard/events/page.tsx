@@ -4,6 +4,7 @@ import { api } from "@/lib/api";
 import type { EventRow } from "@/lib/types";
 import { formatTime, visible } from "@/lib/format";
 import { PageHeader, Panel, DecoyBadge, TechniqueChip, Empty } from "@/components/ui";
+import LiveFeed from "./live-feed";
 
 export const metadata: Metadata = { title: "Live Events Log" };
 
@@ -26,7 +27,7 @@ export default async function EventsPage({
         title="Live Events Telemetry Log"
         subtitle="Real-time security event stream captured across all integrated honeynet decoys."
       />
-
+      <LiveFeed />
       <Panel title={`Captured Telemetry Stream (${events.length} events)`} flush>
         {events.length === 0 ? (
           <Empty title="No matching events found" />

@@ -237,6 +237,71 @@ function buildServer(db) {
       if (path === "/crdt") return send(res, 200, await crdtOverview());
       const isDemo = url.searchParams.get("data") === "demo";
       const baseFilter = isDemo ? { synthetic: true } : { synthetic: { $ne: true } };
+            if (path === "/stream") {
+        res.writeHead(200, {
+          "Content-Type": "text/event-stream",
+          "Cache-Control": "no-cache, no-transform",
+          Connection: "keep-alive",
+        });
+        res.write("retry: 3000\n\n");
+
+        const WINDOW_MS = 60_000;
+        const seen = new Map();
+        let decisionTs = new Date();
+        let first = true;
+        let busy = false;
+        let n = 0;
+        const push = (type, doc) => res.write(`event: ${type}\ndata: ${JSON.stringify(doc)}\n\n`);
+
+        const tick = async () => {
+          if (busy) return;
+          busy = true;
+          try {
+            const cutoff = new Date(Date.now() - WINDOW_MS);
+            const evs = await events
+              .find({ synthetic: { $ne: true }, timestamp: { $gte: cutoff } }, { projection: { raw: 0 } })
+              .sort({ timestamp: 1 })
+              .limit(200)
+              .toArray();
+            for (const e of evs) {
+              const id = String(e._id);
+              if (seen.has(id)) continue;
+              seen.set(id, e.timestamp.getTime());
+              if (!first) push("event", e);
+            }
+            for (const [id, ts] of seen) if (ts < cutoff.getTime()) seen.delete(id);
+
+            const decs = await db
+              .collection("adaptive_decisions")
+              .find({ synthetic: { $ne: true }, timestamp: { $gt: decisionTs } })
+              .sort({ timestamp: 1 })
+              .limit(50)
+              .toArray();
+            for (const d of decs) {
+              push("decision", {
+                _id: d._id,
+                timestamp: d.timestamp,
+                src_ip: d.src_ip,
+                session: d.session,
+                action: d.action,
+                fallback: d.fallback,
+              });
+              decisionTs = d.timestamp;
+            }
+            first = false;
+            if (++n % 7 === 0) res.write(": ping\n\n");
+          } catch (err) {
+            console.error(`stream: ${err.message}`);
+          } finally {
+            busy = false;
+          }
+        };
+
+        tick();
+        const timer = setInterval(tick, 2000);
+        req.on("close", () => clearInterval(timer));
+        return;
+      }
       if (path === "/adaptive/decisions" && method === "GET") {
         const limit = Math.min(Number(url.searchParams.get("limit")) || 50, 100);
         const docs = await db.collection("adaptive_decisions").find({}).sort({ timestamp: -1 }).limit(limit).toArray();
