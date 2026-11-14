@@ -25,6 +25,36 @@ spec:
             - name: nginx-conf
               mountPath: /etc/nginx/conf.d
               readOnly: true
+        - name: crdt
+          image: honeynet-backend:dev
+          imagePullPolicy: Never
+          command: ["node", "crdt-sidecar.js"]
+          env:
+            - name: DECOY_NAME
+              value: web-portal
+            - name: PORT
+              value: "7000"
+            - name: LOG_FILE
+              value: /logs/web-portal/web.json
+            - name: LOG_FORMAT
+              value: jsonl
+            - name: NORMALIZER
+              value: web-portal
+            - name: PEERS
+              value: http://cowrie-crdt:7000,http://heralding-crdt:7000,http://dionaea-crdt:7000
+          ports:
+            - containerPort: 7000
+          resources:
+            requests:
+              cpu: 20m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 128Mi
+          volumeMounts:
+            - name: alllogs
+              mountPath: /logs
+              readOnly: true
       volumes:
         - name: html
           configMap:
@@ -32,6 +62,10 @@ spec:
         - name: nginx-conf
           configMap:
             name: nginx-conf
+        - name: alllogs
+          hostPath:
+            path: /logs
+            type: Directory
 ---
 apiVersion: v1
 kind: Service
