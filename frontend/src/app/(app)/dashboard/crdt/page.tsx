@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { api } from "@/lib/api";
 import { PageHeader, Panel } from "@/components/ui";
+import CrdtGraph from "./crdt-graph";
 
 export const metadata: Metadata = { title: "Shared Attacker State" };
 
@@ -76,6 +77,10 @@ export default async function CrdtPage() {
                 </div>
               ))}
             </div>
+          </Panel>
+          
+          <Panel title="Who saw whom" hint="Each line joins an attacker IP to a decoy that recorded it. Colour shows the highest level reached.">
+            <CrdtGraph ips={data.ips} />
           </Panel>
 
           <Panel title={`Attacker IPs known across decoys (${data.ips_total})`} hint="Merged from all sidecars">
