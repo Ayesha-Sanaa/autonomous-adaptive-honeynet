@@ -41,7 +41,7 @@ async function runFakeAttackTest() {
 
   console.log("\n[2/3] Triggering Adaptive RL Engine (Features -> Sidecar -> Decoy Action)...");
   const decision = await evaluateAndDecide(db, { session: TEST_SESSION, src_ip: TEST_IP });
-
+  await db.collection("adaptive_decisions").updateOne({ _id: decision._id }, { $set: { synthetic: true } });
   console.log("\n[3/3] Adaptive Decision Result Stored in MongoDB:");
   console.log("-------------------------------------------------------------");
   console.log(`  Decision ID:        ${decision._id}`);

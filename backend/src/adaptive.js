@@ -9,8 +9,13 @@ const { extractSessionFeatures } = require("./features");
 
 const SIDECAR_URL = process.env.SIDECAR_URL || "http://localhost:5000";
 const ALLOWED_ACTIONS = ["maintain", "escalate_tier", "plant_breadcrumb", "observe_only"];
-
-function callSidecar(payload, timeoutMs = 2500) {
+async function callSidecar(payload) {
+  const first = await callSidecarOnce(payload);
+  if (!first.fallback) return first;
+  await new Promise((r) => setTimeout(r, 1500));
+  return callSidecarOnce(payload, 4000);
+}
+function callSidecarOnce(payload, timeoutMs = 2500) {
   return new Promise((resolve) => {
     try {
       const url = new URL("/predict", SIDECAR_URL);
