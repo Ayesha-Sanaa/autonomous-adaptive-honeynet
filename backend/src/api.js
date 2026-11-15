@@ -227,7 +227,40 @@ function buildServer(db) {
         }
         return send(res, 405, { error: "method not allowed" });
       }
-
+      if (path === "/reports" || path.startsWith("/reports/")) {
+        const reports = db.collection("reports");
+        if (path === "/reports" && method === "GET") {
+          return send(res, 200, await reports.find({}).sort({ created_at: -1 }).limit(100).toArray());
+        }
+        if (path === "/reports" && method === "POST") {
+          const b = await readJson(req);
+          const title = String(b.title || "").trim().slice(0, 120);
+          const notes = String(b.notes || "").trim().slice(0, 4000);
+          const severity = ["low", "medium", "high"].includes(b.severity) ? b.severity : null;
+          const src_ip = String(b.src_ip || "").trim().slice(0, 64);
+          if (!title || !notes || !severity) {
+            return send(res, 400, { error: "title, notes and severity are required" });
+          }
+          const doc = {
+            _id: require("crypto").randomUUID(),
+            title,
+            notes,
+            severity,
+            src_ip: src_ip || null,
+            author: user.username,
+            created_at: new Date(),
+          };
+          await reports.insertOne(doc);
+          return send(res, 201, doc);
+        }
+        const rm = /^\/reports\/([^/]+)$/.exec(path);
+        if (rm && method === "DELETE") {
+          if (user.role !== "admin") return send(res, 403, { error: "admins only" });
+          await reports.deleteOne({ _id: dec(rm[1]) });
+          return send(res, 200, { ok: true });
+        }
+        return send(res, 405, { error: "method not allowed" });
+      }
       if (method !== "GET") return send(res, 405, { error: "method not allowed" });
 
       if (path === "/audit") {
