@@ -304,21 +304,22 @@ function buildServer(db) {
       }
       if (path === "/adaptive/decisions" && method === "GET") {
         const limit = Math.min(Number(url.searchParams.get("limit")) || 50, 100);
-        const docs = await db.collection("adaptive_decisions").find({}).sort({ timestamp: -1 }).limit(limit).toArray();
+        const docs = await db.collection("adaptive_decisions").find(baseFilter).sort({ timestamp: -1 }).limit(limit).toArray();
         return send(res, 200, docs);
       }
 
       if (path === "/adaptive/stats" && method === "GET") {
-        const total = await db.collection("adaptive_decisions").countDocuments({});
+        const total = await db.collection("adaptive_decisions").countDocuments(baseFilter);
         const actions = await db.collection("adaptive_decisions").aggregate([
+          { $match: baseFilter },
           { $group: { _id: "$action", count: { $sum: 1 } } }
         ]).toArray();
         const actionCounts = { maintain: 0, escalate_tier: 0, plant_breadcrumb: 0, observe_only: 0 };
         for (const a of actions) {
           if (a._id in actionCounts) actionCounts[a._id] = a.count;
         }
-        const fallbackCount = await db.collection("adaptive_decisions").countDocuments({ fallback: true });
-        const latest = await db.collection("adaptive_decisions").findOne({}, { sort: { timestamp: -1 } });
+        const fallbackCount = await db.collection("adaptive_decisions").countDocuments({ ...baseFilter, fallback: true });
+        const latest = await db.collection("adaptive_decisions").findOne(baseFilter, { sort: { timestamp: -1 } });
         return send(res, 200, {
           total,
           by_action: actionCounts,

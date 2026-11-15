@@ -15,7 +15,21 @@ export const metadata: Metadata = { title: "Overview" };
 
 // An attacker with this many events or more is flagged as heavy activity.
 const HEAVY_EVENTS = 10;
+type AdaptiveStats = {
+  total: number;
+  by_action: Record<string, number>;
+  fallback_count: number;
+  latest_decision: string | null;
+};
 
+type CrdtSummary = { nodes_total: number; nodes_up: number; ips_total: number };
+
+const ACTION_LABELS: [string, string][] = [
+  ["maintain", "Maintain"],
+  ["escalate_tier", "Escalate tier"],
+  ["plant_breadcrumb", "Plant breadcrumb"],
+  ["observe_only", "Observe only"],
+];
 function Severity({ level }: { level: "High" | "Medium" }) {
   const cls = level === "High" ? "border-danger/40 bg-danger/10 text-danger" : "border-warn/40 bg-warn/10 text-warn";
   return <span className={`shrink-0 rounded border px-1.5 py-0.5 text-[11px] font-medium ${cls}`}>{level}</span>;
@@ -58,7 +72,18 @@ export default async function OverviewPage() {
   ]);
 
   const recent = events.slice(0, 12);
-
+  let adaptive: AdaptiveStats | null = null;
+  let crdt: CrdtSummary | null = null;
+  try {
+    adaptive = await api<AdaptiveStats>("/adaptive/stats");
+  } catch {
+    adaptive = null;
+  }
+  try {
+    crdt = await api<CrdtSummary>("/crdt");
+  } catch {
+    crdt = null;
+  }
   const techniques = new Map<string, { id: string; name: string; tactics: string[]; count: number }>();
   const bump = (t: { id: string; name: string; tactics: string[] }, by: number) => {
     const cur = techniques.get(t.id) ?? { ...t, count: 0 };
@@ -94,7 +119,7 @@ export default async function OverviewPage() {
 
   const pairMap = new Map<string, Pair>();
   for (const e of events) {
-    if (e.username === undefined || e.password === undefined) continue;
+        if (e.username == null || e.password == null) continue;
     const key = `${e.username}\u0000${e.password}`;
     const cur = pairMap.get(key) ?? { user: e.username, pass: e.password, count: 0, worked: false };
     cur.count += 1;
@@ -149,7 +174,53 @@ export default async function OverviewPage() {
         <StatCell href="/dashboard/sessions?login=success" label="Logins that worked" value={formatNumber(breached.length)} note="got into a decoy shell" alert={breached.length > 0} />
         <StatCell href="/dashboard/mitre" label="ATT&CK techniques" value={formatNumber(techniques.size)} note="distinct techniques seen" className="col-span-2 lg:col-span-1" />
       </div>
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Panel title="Adaptive engine" hint="PPO decisions on finished SSH sessions">
+          {adaptive === null ? (
+            <p className="text-sm text-muted">Adaptive data is not available right now.</p>
+          ) : (
+            <div>
+              <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+                {ACTION_LABELS.map(([key, label]) => (
+                  <div key={key}>
+                    <div className="text-xs text-faint">{label}</div>
+                    <div className="mt-1 font-mono text-2xl tabular-nums">{adaptive.by_action?.[key] ?? 0}</div>
+                  </div>
+                ))}
+              </div>
+              <p className="mt-4 text-xs text-muted">
+                {formatNumber(adaptive.total)} decisions, {formatNumber(adaptive.fallback_count)} used the safe fallback.{" "}
+                <Link href="/dashboard/adaptive" className="underline decoration-line-strong underline-offset-4 hover:text-fg">Open the engine</Link>
+              </p>
+            </div>
+          )}
+        </Panel>
 
+        <Panel title="Shared attacker state" hint="CRDT sync between decoys">
+          {crdt === null ? (
+            <p className="text-sm text-muted">Shared state is not available right now.</p>
+          ) : (
+            <div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <div className="text-xs text-faint">Sidecars reachable</div>
+                  <div className={`mt-1 font-mono text-2xl tabular-nums ${crdt.nodes_up < crdt.nodes_total ? "text-danger" : ""}`}>
+                    {crdt.nodes_up} / {crdt.nodes_total}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-xs text-faint">Attacker IPs known to all</div>
+                  <div className="mt-1 font-mono text-2xl tabular-nums">{formatNumber(crdt.ips_total)}</div>
+                </div>
+              </div>
+              <p className="mt-4 text-xs text-muted">
+                Each decoy keeps its own copy and they merge it.{" "}
+                <Link href="/dashboard/crdt" className="underline decoration-line-strong underline-offset-4 hover:text-fg">See who saw whom</Link>
+              </p>
+            </div>
+          )}
+        </Panel>
+      </div>
       <div className="grid gap-6 xl:grid-cols-3">
         <Panel title="Events per day" hint={`${formatDay(days[0].day)} to ${formatDay(days[days.length - 1].day)}`} className="xl:col-span-2">
           {stats.total === 0 ? <Empty title="No events yet">They appear here as soon as something touches a decoy.</Empty> : <DayBars days={days} dayDecoys={stats.by_day_decoy} />}
