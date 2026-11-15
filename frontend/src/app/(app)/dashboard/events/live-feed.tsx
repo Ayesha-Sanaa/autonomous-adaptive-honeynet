@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
 type LiveEvent = {
   _id: string;
@@ -28,25 +29,37 @@ function hhmmss(ts: string) {
 }
 
 export default function LiveFeed() {
+    const router = useRouter();
   const [status, setStatus] = useState<"connecting" | "live" | "offline">("connecting");
   const [events, setEvents] = useState<LiveEvent[]>([]);
   const [decisions, setDecisions] = useState<LiveDecision[]>([]);
 
   useEffect(() => {
     const es = new EventSource("/api/stream");
+        let timer: ReturnType<typeof setTimeout> | null = null;
+    const refreshSoon = () => {
+      if (timer) return;
+      timer = setTimeout(() => {
+        timer = null;
+        router.refresh();
+      }, 2000);
+    };
     es.onopen = () => setStatus("live");
     es.onerror = () => setStatus(es.readyState === EventSource.CLOSED ? "offline" : "connecting");
     es.addEventListener("event", (m) => {
       const e = JSON.parse((m as MessageEvent).data) as LiveEvent;
       setEvents((prev) => [e, ...prev.filter((x) => x._id !== e._id)].slice(0, 12));
+      refreshSoon();
     });
     es.addEventListener("decision", (m) => {
       const d = JSON.parse((m as MessageEvent).data) as LiveDecision;
       setDecisions((prev) => [d, ...prev.filter((x) => x._id !== d._id)].slice(0, 6));
     });
-    return () => es.close();
-  }, []);
-
+       return () => {
+      if (timer) clearTimeout(timer);
+      es.close();
+    };
+  }, [router]);
   const dot =
     status === "live" ? "bg-green-500" : status === "connecting" ? "bg-yellow-500" : "bg-red-500";
 
