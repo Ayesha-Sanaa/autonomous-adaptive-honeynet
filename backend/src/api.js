@@ -351,6 +351,7 @@ function buildServer(db) {
       }
 
       if (path === "/stats") {
+        const statDays = Math.min(Math.max(Number(url.searchParams.get("days")) || 30, 1), 365);
         return send(res, 200, {
           total: await events.countDocuments(baseFilter),
           by_decoy: await top(events, baseFilter, "decoy", 10),
@@ -359,8 +360,8 @@ function buildServer(db) {
           top_usernames: await top(events, baseFilter, "username"),
           top_passwords: await top(events, baseFilter, "password"),
           top_commands: await top(events, baseFilter, "command"),
-          by_day: await byDay(events, baseFilter, 30),
-          by_day_decoy: await byDayDecoy(events, baseFilter, 30),
+          by_day: await byDay(events, baseFilter, statDays),
+          by_day_decoy: await byDayDecoy(events, baseFilter, statDays),
         });
       }
 

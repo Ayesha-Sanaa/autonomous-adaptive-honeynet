@@ -15,6 +15,17 @@ export const metadata: Metadata = { title: "Overview" };
 
 // An attacker with this many events or more is flagged as heavy activity.
 const HEAVY_EVENTS = 10;
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const DAY_MS = 86_400_000;
+const MAX_SPAN = 90;
+
+function parseDay(s?: string): Date | null {
+  if (!s || !DATE_RE.test(s)) return null;
+  const d = new Date(`${s}T00:00:00Z`);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+const isoDay = (d: Date) => d.toISOString().slice(0, 10);
 type AdaptiveStats = {
   total: number;
   by_action: Record<string, number>;
@@ -62,15 +73,30 @@ function TopList({ title, rows, color }: { title: string; rows: Counted[]; color
     </div>
   );
 }
+export default async function OverviewPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ from?: string; to?: string }>;
+}) {
+  const sp = await searchParams;
+  const nowDate = new Date();
+  const todayUtc = new Date(Date.UTC(nowDate.getUTCFullYear(), nowDate.getUTCMonth(), nowDate.getUTCDate()));
+  let toD = parseDay(sp.to) ?? todayUtc;
+  if (toD > todayUtc) toD = todayUtc;
+  let fromD = parseDay(sp.from) ?? new Date(toD.getTime() - 13 * DAY_MS);
+  if (fromD > toD) fromD = toD;
+  if (Math.round((toD.getTime() - fromD.getTime()) / DAY_MS) + 1 > MAX_SPAN) {
+    fromD = new Date(toD.getTime() - (MAX_SPAN - 1) * DAY_MS);
+  }
+  const spanDays = Math.round((toD.getTime() - fromD.getTime()) / DAY_MS) + 1;
+  const daysBack = Math.round((todayUtc.getTime() - fromD.getTime()) / DAY_MS) + 1;
 
-export default async function OverviewPage() {
   const [stats, attackers, sessions, events] = await Promise.all([
-    api<Stats>("/stats"),
+    api<Stats>(`/stats?days=${daysBack}`),
     api<Attacker[]>("/attackers?limit=200"),
     api<Session[]>("/sessions?limit=200"),
     api<EventRow[]>("/events?limit=200"),
   ]);
-
   const recent = events.slice(0, 12);
   let adaptive: AdaptiveStats | null = null;
   let crdt: CrdtSummary | null = null;
@@ -103,11 +129,12 @@ export default async function OverviewPage() {
   const scanners = attackers.filter((a) => a.behaviours.some((b) => b.id === "T1595"));
   const scannerIps = new Set(scanners.map((a) => a.src_ip));
   const heavy = attackers.filter((a) => a.events >= HEAVY_EVENTS && !scannerIps.has(a.src_ip));
-  const days = fillDays(stats.by_day, 14);
+  const days = fillDays(stats.by_day, spanDays, toD);
+  const dayKeys = new Set(days.map((d) => d.day));
   const maxAttacker = Math.max(1, ...attackers.map((a) => a.events));
   const now = Date.now();
 
-  const todayCount = days[days.length - 1]?.count ?? 0;
+  const todayCount = fillDays(stats.by_day, 1)[0]?.count ?? 0;
   const active24 = attackers.filter((a) => now - new Date(a.last_seen).getTime() < 86_400_000).length;
   const busiest = attackers.reduce<Attacker | null>((m, a) => (!m || a.events > m.events ? a : m), null);
 
@@ -223,7 +250,23 @@ export default async function OverviewPage() {
       </div>
       <div className="grid gap-6 xl:grid-cols-3">
         <Panel title="Events per day" hint={`${formatDay(days[0].day)} to ${formatDay(days[days.length - 1].day)}`} className="xl:col-span-2">
-          {stats.total === 0 ? <Empty title="No events yet">They appear here as soon as something touches a decoy.</Empty> : <DayBars days={days} dayDecoys={stats.by_day_decoy} />}
+                  <form method="get" className="mb-4 flex flex-wrap items-end gap-3 text-sm">
+            <label className="flex flex-col gap-1 text-xs text-faint">
+              From
+              <input type="date" name="from" defaultValue={isoDay(fromD)} max={isoDay(todayUtc)} className="rounded border border-line bg-surface px-2 py-1 text-sm text-fg" />
+            </label>
+            <label className="flex flex-col gap-1 text-xs text-faint">
+              To
+              <input type="date" name="to" defaultValue={isoDay(toD)} max={isoDay(todayUtc)} className="rounded border border-line bg-surface px-2 py-1 text-sm text-fg" />
+            </label>
+            <button type="submit" className="rounded border border-line-strong px-3 py-1 text-sm hover:bg-surface-2">Apply</button>
+            <Link href="/dashboard" className="py-1 text-xs text-muted underline decoration-line-strong underline-offset-4 hover:text-fg">Last 14 days</Link>
+          </form>
+          {stats.total === 0 ? (
+            <Empty title="No events yet">They appear here as soon as something touches a decoy.</Empty>
+          ) : (
+            <DayBars days={days} dayDecoys={(stats.by_day_decoy ?? []).filter((r) => dayKeys.has(r.day))} />
+          )}
         </Panel>
 
         <Panel title="Needs attention" hint="open each one" flush>
