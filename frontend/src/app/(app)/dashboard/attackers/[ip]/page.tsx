@@ -24,6 +24,33 @@ async function getAttacker(ip: string): Promise<Attacker | null> {
 
 const cmdText = (c: string | { command: string }) => (typeof c === "string" ? c : c.command);
 
+type Decision = {
+  _id: string;
+  timestamp: string;
+  src_ip: string;
+  session: string | null;
+  action: string;
+  fallback: boolean;
+  top_reasons?: string[];
+  synthetic?: boolean;
+};
+
+type SharedIp = {
+  ip: string;
+  level: number;
+  decoys: string[];
+  total_events: number;
+};
+
+type CrdtOverview = { ips: SharedIp[] };
+
+const LEVELS: Record<number, string> = {
+  1: "Connected",
+  2: "Login attempt",
+  3: "Login success",
+  4: "Ran commands",
+};
+
 export default async function AttackerPage({ params }: { params: Promise<{ ip: string }> }) {
   const { ip: rawIp } = await params;
   const ip = decodeURIComponent(rawIp);
@@ -35,6 +62,21 @@ export default async function AttackerPage({ params }: { params: Promise<{ ip: s
   ]);
   if (!attacker) notFound();
 
+  let decisions: Decision[] = [];
+  let shared: SharedIp | null = null;
+  try {
+    const all = await api<Decision[]>("/adaptive/decisions?limit=100");
+    decisions = all.filter((d) => d.src_ip === ip && !d.synthetic).slice(0, 10);
+  } catch {
+    decisions = [];
+  }
+  try {
+    const crdt = await api<CrdtOverview>("/crdt");
+    shared = crdt.ips.find((x) => x.ip === ip) ?? null;
+  } catch {
+    shared = null;
+  }
+
   const now = Date.now();
   const ipSessions = sessions.filter((s) => s.src_ip === ip);
   const breached = ipSessions.filter((s) => s.login_success);
@@ -42,7 +84,7 @@ export default async function AttackerPage({ params }: { params: Promise<{ ip: s
 
   const pairMap = new Map<string, Pair>();
   for (const e of events) {
-    if (e.username === undefined || e.password === undefined) continue;
+    if (e.username == null || e.password == null) continue;
     const key = `${e.username}\u0000${e.password}`;
     const cur = pairMap.get(key) ?? { user: e.username, pass: e.password, count: 0, worked: false };
     cur.count += 1;
@@ -98,6 +140,48 @@ export default async function AttackerPage({ params }: { params: Promise<{ ip: s
 
         <Panel title="Logins tried" hint="username / password" flush>
           <CredentialPairs pairs={pairs} />
+        </Panel>
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Panel title="RL decisions" hint="adaptive engine" flush>
+          {decisions.length === 0 ? (
+            <Empty title="No decision for this address">A decision is made when an SSH session on the Cowrie decoy ends.</Empty>
+          ) : (
+            <ul className="divide-y divide-line text-sm">
+              {decisions.map((d) => (
+                <li key={d._id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5">
+                  <span className="font-mono text-xs text-muted">{formatTime(d.timestamp)}</span>
+                  <span className="font-mono">{d.action.replace(/_/g, " ")}</span>
+                  {d.fallback ? <span className="text-xs text-danger">fallback</span> : null}
+                  {d.top_reasons && d.top_reasons.length > 0 ? (
+                    <span className="min-w-0 flex-1 truncate text-xs text-faint">{d.top_reasons.join(", ")}</span>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          )}
+        </Panel>
+
+        <Panel title="Shared across decoys" hint="CRDT state">
+          {shared === null ? (
+            <p className="text-sm text-muted">The decoys have not shared any state about this address yet.</p>
+          ) : (
+            <dl className="space-y-3 text-sm">
+              <div className="flex justify-between gap-4">
+                <dt className="text-faint">Highest level reached</dt>
+                <dd>{shared.level} - {LEVELS[shared.level] ?? "Unknown"}</dd>
+              </div>
+              <div className="flex justify-between gap-4">
+                <dt className="text-faint">Known to decoys</dt>
+                <dd>{shared.decoys.map(decoyLabel).join(", ")}</dd>
+              </div>
+              <div className="flex justify-between gap-4">
+                <dt className="text-faint">Events across decoys</dt>
+                <dd className="font-mono tabular-nums">{shared.total_events}</dd>
+              </div>
+            </dl>
+          )}
         </Panel>
       </div>
 
