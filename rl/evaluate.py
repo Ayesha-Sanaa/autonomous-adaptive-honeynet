@@ -18,6 +18,12 @@ POLICIES = {
     "Always plant_breadcrumb": lambda obs, p: 2,
     "Random": lambda obs, p: env.action_space.sample(),
     "Oracle rule (knows attacker type)": lambda obs, p: 3 if p == "scanner" else 2,
+        "Always escalate_tier": lambda obs, p: 1,
+    "Always observe_only": lambda obs, p: 3,
+   
+    "Fair rule (observe if scanner flag, else alternate plant and escalate)": lambda obs, p: 3 if obs[23] > 0.5 else (2 if env.current_step % 2 == 0 else 1),
+    "PPO (sampling actions)": lambda obs, p: int(model.predict(obs, deterministic=False)[0]),
+
 }
 
 

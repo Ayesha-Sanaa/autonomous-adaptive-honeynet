@@ -125,4 +125,4 @@ def train_and_evaluate(total_timesteps: int = 25000):
 
 
 if __name__ == "__main__":
-    train_and_evaluate(total_timesteps=25000)
+    train_and_evaluate(total_timesteps=300000)
