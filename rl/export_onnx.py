@@ -1,7 +1,7 @@
 ﻿"""
-Step 4: Export trained PPO model to ONNX and verify.
-Exports policy with a fixed input shape [1, 25].
-Verifies that ONNX Runtime produces the exact same action output as PyTorch.
+Export the trained PPO model to ONNX and verify it.
+The check compares the logits (not only the top action) on the test vectors and on 300 random inputs.
+Run from the rl folder:  python export_onnx.py
 """
 
 import os
@@ -15,12 +15,7 @@ except ImportError:
     print("Error: stable-baselines3 is not installed.")
     sys.exit(1)
 
-try:
-    import onnx
-    import onnxruntime as ort
-except ImportError:
-    print("Notice: onnx or onnxruntime not installed yet.")
-    print("Please run: python -m pip install onnx onnxruntime")
+import onnxruntime as ort
 
 
 class OnnxablePPOPolicy(torch.nn.Module):
@@ -37,16 +32,12 @@ class OnnxablePPOPolicy(torch.nn.Module):
 
 
 def export_and_verify():
-    print("=============================================================")
-    print("       Step 4: Export PPO Model to ONNX & Verify             ")
-    print("=============================================================")
-
     base_dir = os.path.dirname(os.path.abspath(__file__))
     model_path = os.path.join(base_dir, "ppo_honeynet.zip")
     onnx_path = os.path.join(base_dir, "ppo_honeynet.onnx")
 
     if not os.path.exists(model_path):
-        print(f"Error: Model file not found at {model_path}. Run Step 3 train.py first.")
+        print(f"Error: model file not found at {model_path}. Run train.py first.")
         sys.exit(1)
 
     print(f"Loading trained model: {model_path}")
@@ -55,87 +46,59 @@ def export_and_verify():
     onnx_policy.eval()
 
     dummy_input = torch.zeros((1, 25), dtype=torch.float32)
+    axes = {"observation": {0: "batch_size"}, "action": {0: "batch_size"}, "logits": {0: "batch_size"}}
 
     print(f"Exporting to ONNX: {onnx_path}")
     try:
         torch.onnx.export(
-            onnx_policy,
-            dummy_input,
-            onnx_path,
-            input_names=["observation"],
-            output_names=["action", "logits"],
-            dynamic_axes={"observation": {0: "batch_size"}, "action": {0: "batch_size"}, "logits": {0: "batch_size"}},
-            opset_version=17,
-            dynamo=False,
+            onnx_policy, dummy_input, onnx_path,
+            input_names=["observation"], output_names=["action", "logits"],
+            dynamic_axes=axes, opset_version=17, dynamo=False,
         )
     except TypeError:
         torch.onnx.export(
-            onnx_policy,
-            dummy_input,
-            onnx_path,
-            input_names=["observation"],
-            output_names=["action", "logits"],
-            dynamic_axes={"observation": {0: "batch_size"}, "action": {0: "batch_size"}, "logits": {0: "batch_size"}},
-            opset_version=17,
+            onnx_policy, dummy_input, onnx_path,
+            input_names=["observation"], output_names=["action", "logits"],
+            dynamic_axes=axes, opset_version=17,
         )
-
-    print("ONNX export completed successfully!\n")
-
-    print("-------------------------------------------------------------")
-    print("Verifying ONNX Output vs Original PyTorch Model...")
-    print("-------------------------------------------------------------")
-
-    test_vectors = [
-        ("Automated Scanner Vector", np.zeros(25, dtype=np.float32)),
-        ("Brute Force Attack Vector", np.zeros(25, dtype=np.float32)),
-        ("Interactive Recon Vector", np.zeros(25, dtype=np.float32)),
-        ("Payload Download Vector", np.zeros(25, dtype=np.float32)),
-    ]
-
-    test_vectors[0][1][23] = 1.0  # is_scanner
-    test_vectors[0][1][18] = 1.0  # touches_web_portal
-    
-    test_vectors[1][1][5] = 0.5   # high login attempts
-    test_vectors[1][1][17] = 1.0  # touches_cowrie
-    
-    test_vectors[2][1][12] = 0.4  # recon commands
-    test_vectors[2][1][8] = 1.0   # login success
-    test_vectors[2][1][17] = 1.0
-
-    test_vectors[3][1][13] = 0.8  # download attempts
-    test_vectors[3][1][20] = 0.5  # mitre techniques seen
+    print("Export done.\n")
 
     ort_session = ort.InferenceSession(onnx_path, providers=["CPUExecutionProvider"])
-    action_names = ["maintain", "escalate_tier", "plant_breadcrumb", "observe_only"]
 
-    all_matched = True
-    for label, vec in test_vectors:
+    vectors = []
+    scanner = np.zeros(25, dtype=np.float32); scanner[23] = 1.0; scanner[18] = 1.0
+    vectors.append(scanner)
+    brute = np.zeros(25, dtype=np.float32); brute[5] = 0.5; brute[17] = 1.0
+    vectors.append(brute)
+    recon = np.zeros(25, dtype=np.float32); recon[12] = 0.4; recon[8] = 1.0; recon[17] = 1.0
+    vectors.append(recon)
+    rng = np.random.default_rng(0)
+    for _ in range(300):
+        v = rng.uniform(0.0, 1.0, 25).astype(np.float32)
+        v[rng.random(25) < 0.6] = 0.0
+        vectors.append(v)
+
+    max_diff = 0.0
+    action_matches = 0
+    chosen = [0, 0, 0, 0]
+    for vec in vectors:
         orig_action, _ = model.predict(vec, deterministic=True)
-        orig_action = int(orig_action)
+        with torch.no_grad():
+            _, torch_logits = onnx_policy(torch.tensor(vec).unsqueeze(0))
+        out = ort_session.run(["action", "logits"], {"observation": vec.reshape(1, 25)})
+        onnx_logits = out[1][0]
+        max_diff = max(max_diff, float(np.max(np.abs(torch_logits.numpy()[0] - onnx_logits))))
+        if int(orig_action) == int(out[0][0]):
+            action_matches += 1
+        chosen[int(out[0][0])] += 1
 
-        input_tensor = np.expand_dims(vec, axis=0).astype(np.float32)
-        onnx_outputs = ort_session.run(["action", "logits"], {"observation": input_tensor})
-        onnx_action = int(onnx_outputs[0][0])
-        onnx_logits = onnx_outputs[1][0]
-
-        matched = (orig_action == onnx_action)
-        status = "MATCH [OK]" if matched else "MISMATCH [FAIL]"
-        if not matched:
-            all_matched = False
-
-        print(f"Test: {label}")
-        print(f"  PyTorch Output:  Action {orig_action} ({action_names[orig_action]})")
-        print(f"  ONNX Output:     Action {onnx_action} ({action_names[onnx_action]})")
-        print(f"  Action Logits:   {np.round(onnx_logits, 2)}")
-        print(f"  Verification:    {status}\n")
-
-    print("=============================================================")
-    if all_matched:
-        print("VERIFICATION SUCCESS: ONNX model matches PyTorch 100%!")
-        print("The ONNX model is ready for Step 5 (RL Sidecar Microservice).")
-    else:
-        print("VERIFICATION FAILED: Discrepancy detected.")
-    print("=============================================================\n")
+    total = len(vectors)
+    print(f"Inputs checked:              {total}")
+    print(f"Max logit difference:        {max_diff:.2e}")
+    print(f"Top action matches PyTorch:  {action_matches}/{total}")
+    print(f"Top action counts (maintain, escalate_tier, plant_breadcrumb, observe_only): {chosen}")
+    ok = max_diff < 1e-4 and action_matches == total
+    print("\nVERIFICATION " + ("SUCCESS" if ok else "FAILED"))
 
 
 if __name__ == "__main__":

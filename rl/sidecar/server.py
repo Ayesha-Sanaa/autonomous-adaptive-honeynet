@@ -33,6 +33,8 @@ FEATURES_PATH = resolve_path('FEATURES_PATH', 'features.json')
 ACTIONS = ["maintain", "escalate_tier", "plant_breadcrumb", "observe_only"]
 FALLBACK_ACTION = "maintain"
 FALLBACK_ACTION_ID = 0
+MODEL_VERSION = os.environ.get("MODEL_VERSION", "ppo-v2.0")
+SAMPLE_ACTIONS = os.environ.get("SAMPLE_ACTIONS", "1") == "1"
 
 ort_session = None
 model_loaded = False
@@ -78,14 +80,20 @@ def predict_action(features_list, session_id="unknown", src_ip="unknown"):
                 "action_id": FALLBACK_ACTION_ID,
                 "fallback": True,
                 "reason": "invalid_features_shape",
-                "model_version": "ppo-v1.0",
+                "model_version": MODEL_VERSION,
                 "timestamp": now_iso,
             }
 
         input_array = np.array(features_list, dtype=np.float32).reshape(1, 25)
         outputs = ort_session.run(["action", "logits"], {"observation": input_array})
-        action_idx = int(outputs[0][0])
-        logits = [float(x) for x in outputs[1][0]]
+        logits_arr = np.array(outputs[1][0], dtype=np.float64)
+        logits = [float(x) for x in logits_arr]
+        shifted = logits_arr - logits_arr.max()
+        probs = np.exp(shifted) / np.exp(shifted).sum()
+        if SAMPLE_ACTIONS:
+            action_idx = int(np.random.choice(len(probs), p=probs))
+        else:
+            action_idx = int(outputs[0][0])
 
         if action_idx < 0 or action_idx >= len(ACTIONS):
             action_idx = FALLBACK_ACTION_ID
@@ -98,8 +106,10 @@ def predict_action(features_list, session_id="unknown", src_ip="unknown"):
             "action": action_name,
             "action_id": action_idx,
             "fallback": False,
-            "model_version": "ppo-v1.0",
+            "model_version": MODEL_VERSION,
             "logits": logits,
+            "probs": [float(p) for p in probs],
+            "sampled": SAMPLE_ACTIONS,
             "timestamp": now_iso,
         }
 
@@ -110,7 +120,7 @@ def predict_action(features_list, session_id="unknown", src_ip="unknown"):
             "action_id": FALLBACK_ACTION_ID,
             "fallback": True,
             "reason": str(err),
-            "model_version": "ppo-v1.0",
+            "model_version": MODEL_VERSION,
             "timestamp": now_iso,
         }
 
