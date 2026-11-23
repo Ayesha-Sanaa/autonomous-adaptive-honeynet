@@ -126,11 +126,18 @@ class HoneynetEnv(gym.Env):
         obs = self._get_obs()
         info = {"attacker_profile": p, "engagement": self.engagement}
         return obs, info
-
     def step(self, action: int) -> Tuple[np.ndarray, float, bool, bool, Dict[str, Any]]:
         self.current_step += 1
         p = self.attacker_profile
         reward = -ACTION_COST[action]
+        parts = {
+            "action_cost": -ACTION_COST[action],
+            "new_lures": 0.0,
+            "found_alone": 0.0,
+            "scanner_escalate": 0.0,
+            "frustration_exit": 0.0,
+            "suspicion_exit": 0.0,
+        }
         new_tech = 0   # found because of our action
         natural = 0    # found by the attacker alone
 
@@ -157,6 +164,7 @@ class HoneynetEnv(gym.Env):
             if p == "scanner":
                 self.suspicion += 0.15
                 reward -= 0.5
+                parts["scanner_escalate"] -= 0.5
 
         # Showing the same lure again and again looks fake.
         if action in (1, 2) and p != "scanner" and self.repeat >= 3:
@@ -172,6 +180,8 @@ class HoneynetEnv(gym.Env):
 
         found = new_tech + natural
         reward += NEW_THING_REWARD * new_tech + NATURAL_REWARD * natural
+        parts["new_lures"] = NEW_THING_REWARD * new_tech
+        parts["found_alone"] = NATURAL_REWARD * natural
 
         if found > 0:
             self.frustration = max(0.0, self.frustration - 0.25)
@@ -200,10 +210,12 @@ class HoneynetEnv(gym.Env):
         if self.frustration >= 0.90:
             if p != "scanner":
                 reward -= 4.0   # a scanner leaves anyway, so no penalty for it
+                parts["frustration_exit"] = -4.0
             terminated = True
             self.raw_features[4] = 0.0
         elif self.suspicion >= 0.85:
             reward -= 5.0
+            parts["suspicion_exit"] = -5.0
             terminated = True
             self.raw_features[4] = 0.0
         elif self.current_step >= self.max_steps:
@@ -216,6 +228,7 @@ class HoneynetEnv(gym.Env):
             "action_taken": self.action_names[action],
             "revealed_techniques_count": len(self.revealed_techniques),
             "new_found": found,
+            "reward_parts": parts,
             "engagement": self.engagement,
             "frustration": self.frustration,
             "suspicion": self.suspicion,
