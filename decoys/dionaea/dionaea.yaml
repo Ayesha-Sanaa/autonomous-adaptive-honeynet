@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: dionaea
-          image: dinotools/dionaea:nightly
+          image: docker.io/dinotools/dionaea@sha256:247ad0c2deff460c41ebd2e6bdf70d5b4322048cef72cd60ab68c98c23cea906
           env:
             - name: DIONAEA_FORCE_INIT_CONF
               value: "1"

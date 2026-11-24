@@ -15,7 +15,7 @@ spec:
     spec:
       initContainers:
         - name: build-fs
-          image: cowrie/cowrie:latest
+          image: docker.io/cowrie/cowrie@sha256:115ed9b682dce64a112d6185dcd64c94969599e5b63f13c3e85927a9b2f0292f
           command: ["python3", "/scripts/build-fs.py"]
           volumeMounts:
             - name: fs
@@ -25,7 +25,7 @@ spec:
               readOnly: true
       containers:
         - name: cowrie
-          image: cowrie/cowrie:latest
+          image: docker.io/cowrie/cowrie@sha256:115ed9b682dce64a112d6185dcd64c94969599e5b63f13c3e85927a9b2f0292f
           env:
             - name: COWRIE_SHELL_FILESYSTEM
               value: /fs/custom-fs.pickle
