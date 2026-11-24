@@ -1,0 +1,236 @@
+# Isolation for the decoy pods. A decoy can only do what the policies below allow.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: decoys-default-deny
+  namespace: honeynet
+spec:
+  podSelector:
+    matchExpressions:
+      - key: app
+        operator: In
+        values: [cowrie, dionaea, heralding, web-portal, backend]
+  policyTypes: [Ingress, Egress]
+---
+# HAProxy is the only way in from outside the decoy group
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-haproxy-to-cowrie
+  namespace: honeynet
+spec:
+  podSelector:
+    matchLabels:
+      app: cowrie
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: haproxy
+      ports:
+        - protocol: TCP
+          port: 2222
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-haproxy-to-web-portal
+  namespace: honeynet
+spec:
+  podSelector:
+    matchLabels:
+      app: web-portal
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: haproxy
+      ports:
+        - protocol: TCP
+          port: 80
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-haproxy-to-heralding
+  namespace: honeynet
+spec:
+  podSelector:
+    matchLabels:
+      app: heralding
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: haproxy
+      ports:
+        - protocol: TCP
+          port: 21
+        - protocol: TCP
+          port: 23
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-haproxy-to-dionaea
+  namespace: honeynet
+spec:
+  podSelector:
+    matchLabels:
+      app: dionaea
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: haproxy
+      ports:
+        - protocol: TCP
+          port: 445
+        - protocol: TCP
+          port: 3306
+---
+# The web portal page talks to its own capture server, nothing else
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-web-portal-to-backend
+  namespace: honeynet
+spec:
+  podSelector:
+    matchLabels:
+      app: backend
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: web-portal
+      ports:
+        - protocol: TCP
+          port: 3000
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: web-portal-egress-to-backend
+  namespace: honeynet
+spec:
+  podSelector:
+    matchLabels:
+      app: web-portal
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: backend
+      ports:
+        - protocol: TCP
+          port: 3000
+---
+# CRDT sidecars share state on port 7000 between the four decoy pods; the API reads it
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: crdt-sync
+  namespace: honeynet
+spec:
+  podSelector:
+    matchExpressions:
+      - key: app
+        operator: In
+        values: [cowrie, dionaea, heralding, web-portal]
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - podSelector:
+            matchExpressions:
+              - key: app
+                operator: In
+                values: [cowrie, dionaea, heralding, web-portal, api]
+      ports:
+        - protocol: TCP
+          port: 7000
+  egress:
+    - to:
+        - podSelector:
+            matchExpressions:
+              - key: app
+                operator: In
+                values: [cowrie, dionaea, heralding, web-portal]
+      ports:
+        - protocol: TCP
+          port: 7000
+---
+# Name lookups for the four decoy pods (needed for service names). This is a known small gap: see the report notes.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: decoys-dns
+  namespace: honeynet
+spec:
+  podSelector:
+    matchExpressions:
+      - key: app
+        operator: In
+        values: [cowrie, dionaea, heralding, web-portal]
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+---
+# HAProxy may only talk to the decoys and to DNS
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: haproxy-egress
+  namespace: honeynet
+spec:
+  podSelector:
+    matchLabels:
+      app: haproxy
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - podSelector:
+            matchExpressions:
+              - key: app
+                operator: In
+                values: [cowrie, dionaea, heralding, web-portal]
+      ports:
+        - protocol: TCP
+          port: 2222
+        - protocol: TCP
+          port: 80
+        - protocol: TCP
+          port: 21
+        - protocol: TCP
+          port: 23
+        - protocol: TCP
+          port: 445
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
