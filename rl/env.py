@@ -36,8 +36,9 @@ NATURAL_REWARD = 1.0
 class HoneynetEnv(gym.Env):
     metadata = {"render_modes": ["human"]}
 
-    def __init__(self, features_json_path: str = None):
+    def __init__(self, features_json_path: str = None, reward_mode: str = "novelty"):
         super().__init__()
+        self.reward_mode = reward_mode
 
         if features_json_path is None:
             base_dir = os.path.dirname(os.path.abspath(__file__))
@@ -233,4 +234,8 @@ class HoneynetEnv(gym.Env):
             "frustration": self.frustration,
             "suspicion": self.suspicion,
         }
+        if self.reward_mode == "length":
+            # reward for every step the attacker stays, the same exit penalties
+            reward = (-ACTION_COST[action] + 0.2 + parts["scanner_escalate"]
+                      + parts["frustration_exit"] + parts["suspicion_exit"])
         return obs, reward, terminated, truncated, info
