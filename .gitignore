@@ -8,3 +8,5 @@ node_modules/
 *.log
 
 rl/seed_models/
+
+backups/
