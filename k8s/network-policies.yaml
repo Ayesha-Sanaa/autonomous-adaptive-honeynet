@@ -234,3 +234,22 @@ spec:
           port: 53
         - protocol: TCP
           port: 53
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-collector-to-cowrie-actuator
+  namespace: honeynet
+spec:
+  podSelector:
+    matchLabels:
+      app: cowrie
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: collector
+      ports:
+        - protocol: TCP
+          port: 7100

@@ -41,6 +41,30 @@ spec:
             - name: fs
               mountPath: /fs
               readOnly: true
+            - name: actions
+              mountPath: /actions
+              readOnly: true
+        - name: actuator
+          image: honeynet-backend:dev
+          imagePullPolicy: Never
+          command: ["node", "/app/cowrie-actuator.js"]
+          env:
+            - name: ACTUATOR_PORT
+              value: "7100"
+            - name: ACTIONS_DIR
+              value: /actions
+          ports:
+            - containerPort: 7100
+          resources:
+            requests:
+              cpu: 20m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 128Mi
+          volumeMounts:
+            - name: actions
+              mountPath: /actions
         - name: crdt
           image: honeynet-backend:dev
           imagePullPolicy: Never
@@ -85,6 +109,8 @@ spec:
             name: cowrie-userdb
         - name: fs
           emptyDir: {}
+        - name: actions
+          emptyDir: {}
         - name: fs-builder
           configMap:
             name: cowrie-fs-builder
@@ -101,8 +127,17 @@ spec:
   ports:
     - port: 2222
       targetPort: 2222
-
-
-
-
-
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cowrie-actuator
+  namespace: honeynet
+spec:
+  type: ClusterIP
+  selector:
+    app: cowrie
+  ports:
+    - name: http
+      port: 7100
+      targetPort: 7100

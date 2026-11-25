@@ -23,6 +23,10 @@ spec:
               value: mongodb://mongodb:27017
             - name: SIDECAR_URL
               value: http://rl-sidecar:5000
+            - name: ACTUATOR_URL
+              value: http://cowrie-actuator:7100
+            - name: LIVE_ACTIONS
+              value: "1"
           volumeMounts:
             - name: logs
               mountPath: /logs

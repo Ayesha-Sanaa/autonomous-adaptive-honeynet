@@ -14,6 +14,7 @@ function getSpec() {
     path.resolve(__dirname, "../../rl/features.json"),
     path.resolve(__dirname, "../features.json"),
     path.resolve(__dirname, "../../features.json"),
+    "/rl/features.json",
   ];
   for (const p of candidates) {
     if (fs.existsSync(p)) {
@@ -125,7 +126,7 @@ async function extractSessionFeatures(db, { session, src_ip }) {
   const normalized = raw.map((val, idx) => {
     const f = featureSpec.features[idx] || { range: [0, 100] };
     const [minV, maxV] = f.range;
-    const span = maxV > minV ? maxV - minV : 1.0;
+    const span = (maxV - minV) || 1;
     const clamped = Math.min(Math.max(val, minV), maxV);
     return Number(((clamped - minV) / span).toFixed(4));
   });
@@ -135,7 +136,6 @@ async function extractSessionFeatures(db, { session, src_ip }) {
     normalized,
     eventsCount: totalEvents,
     src_ip: events[0].src_ip,
-    session: session || events[0].session,
   };
 }
 

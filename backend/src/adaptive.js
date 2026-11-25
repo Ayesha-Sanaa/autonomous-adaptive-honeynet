@@ -1,7 +1,7 @@
-﻿/**
+/**
  * Adaptive Decision Controller.
  * Interacts with RL sidecar, enforces fallback, stores decisions in MongoDB,
- * and safely applies adaptive actions (planting breadcrumbs, adjusting tier, passive observation).
+ * and safely records adaptive actions (planting breadcrumbs, adjusting tier, passive observation).
  */
 
 const http = require("http");
@@ -9,12 +9,15 @@ const { extractSessionFeatures } = require("./features");
 
 const SIDECAR_URL = process.env.SIDECAR_URL || "http://localhost:5000";
 const ALLOWED_ACTIONS = ["maintain", "escalate_tier", "plant_breadcrumb", "observe_only"];
+const LIVE_ACTIONS_ENABLED = process.env.LIVE_ACTIONS !== "0";
+
 async function callSidecar(payload) {
   const first = await callSidecarOnce(payload);
   if (!first.fallback) return first;
   await new Promise((r) => setTimeout(r, 1500));
   return callSidecarOnce(payload, 4000);
 }
+
 function callSidecarOnce(payload, timeoutMs = 2500) {
   return new Promise((resolve) => {
     try {
@@ -87,7 +90,11 @@ function getTopReasons(rawFeatures) {
   return reasons.slice(0, 3);
 }
 
-async function applyDecoyAction(db, action, { src_ip, session }) {
+async function applyDecoyAction(db, action, { src_ip, session, phase, seq }) {
+  if (phase === "live" && !LIVE_ACTIONS_ENABLED) {
+    return { type: "live_actions_disabled", target_decoy: "cowrie", phase, seq: seq ?? null };
+  }
+
   const decoyStateCol = db.collection("decoy_state");
   const now = new Date();
   let details = {};
@@ -120,8 +127,7 @@ async function applyDecoyAction(db, action, { src_ip, session }) {
   return details;
 }
 
-async function evaluateAndDecide(db, { session, src_ip }) {
- 
+async function evaluateAndDecide(db, { session, src_ip, phase = "final", seq = null, latency_ms = null }) {
   const decisionsCol = db.collection("adaptive_decisions");
   const featureData = await extractSessionFeatures(db, { session, src_ip });
 
@@ -134,18 +140,26 @@ async function evaluateAndDecide(db, { session, src_ip }) {
   const valid = ALLOWED_ACTIONS.includes(sidecarResponse.action);
   const action = valid ? sidecarResponse.action : "maintain";
   const actionId = ALLOWED_ACTIONS.indexOf(action);
-  const appliedDetails = await applyDecoyAction(db, action, { session, src_ip: featureData.src_ip });
+  const appliedDetails = await applyDecoyAction(db, action, {
+    session,
+    src_ip: featureData.src_ip,
+    phase,
+    seq,
+  });
   const topReasons = getTopReasons(featureData.raw);
 
-   const decisionDoc = {
+  const decisionDoc = {
     timestamp: new Date(),
     src_ip: featureData.src_ip || src_ip || "unknown",
     session: session || featureData.session || null,
+    phase,
+    seq,
+    latency_ms,
     action,
     action_id: actionId,
     fallback: !valid || sidecarResponse.fallback || false,
     reason: valid ? sidecarResponse.reason || null : "invalid_action_from_sidecar",
-    model_version: sidecarResponse.model_version || "ppo-v1.0",
+    model_version: sidecarResponse.model_version || "ppo-v2.0",
     logits: sidecarResponse.logits || [],
     top_reasons: topReasons,
     features_raw: featureData.raw,
@@ -159,4 +173,4 @@ async function evaluateAndDecide(db, { session, src_ip }) {
   return decisionDoc;
 }
 
-module.exports = { evaluateAndDecide, applyDecoyAction, getTopReasons };
+module.exports = { evaluateAndDecide, applyDecoyAction, getTopReasons, ALLOWED_ACTIONS };

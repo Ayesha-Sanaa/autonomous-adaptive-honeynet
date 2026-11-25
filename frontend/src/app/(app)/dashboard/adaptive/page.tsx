@@ -9,6 +9,9 @@ type Decision = {
   timestamp: string;
   src_ip: string;
   session: string | null;
+  phase?: "live" | "final" | string;
+  seq?: number | null;
+  latency_ms?: number | null;
   action: string;
   fallback: boolean;
   model_version: string;
@@ -19,6 +22,8 @@ type Decision = {
 type Stats = {
   total: number;
   by_action: Record<string, number>;
+  by_phase?: { live?: number; final?: number };
+  live_latency_ms?: { count?: number; median?: number | null; p95?: number | null };
   fallback_count: number;
   latest_decision: string | null;
 };
@@ -49,11 +54,16 @@ export default async function AdaptivePage() {
     failed = true;
   }
 
+  const liveCount = stats?.by_phase?.live ?? 0;
+  const finalCount = stats?.by_phase?.final ?? 0;
+  const medLat = stats?.live_latency_ms?.median;
+  const p95Lat = stats?.live_latency_ms?.p95;
+
   return (
     <div className="mx-auto max-w-7xl space-y-6">
       <PageHeader
         title="Adaptive Engine"
-        subtitle="Decisions made by the PPO model (25 features, 4 fixed actions). If the model fails, the system falls back to maintain and marks the decision as fallback."
+        subtitle="Decisions made during open sessions (live) and at session end (final). If the model fails, the system falls back to maintain."
       />
 
       {failed || !stats ? (
@@ -65,8 +75,8 @@ export default async function AdaptivePage() {
       ) : (
         <>
           <Panel
-            title={`Decisions by action (${stats.total} total)`}
-            hint={`Fallbacks: ${stats.fallback_count}${stats.latest_decision ? ` · Latest: ${utc(stats.latest_decision)} UTC` : ""}`}
+            title={`Decisions by action (${stats.total} total · live: ${liveCount}, final: ${finalCount})`}
+            hint={`Fallbacks: ${stats.fallback_count}${medLat != null ? ` · Live latency med/p95: ${medLat}ms / ${p95Lat}ms` : ""}${stats.latest_decision ? ` · Latest: ${utc(stats.latest_decision)} UTC` : ""}`}
           >
             <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
               {ACTIONS.map((a) => (
@@ -88,11 +98,12 @@ export default async function AdaptivePage() {
               <Empty title="No decisions yet" />
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[720px] text-left text-sm">
+                <table className="w-full min-w-[780px] text-left text-sm">
                   <thead className="border-b border-line text-xs text-faint">
                     <tr>
                       <th className="px-4 py-2 font-normal">Time (UTC)</th>
                       <th className="px-4 py-2 font-normal">Attacker / session</th>
+                      <th className="px-4 py-2 font-normal">Phase / seq</th>
                       <th className="px-4 py-2 font-normal">Action</th>
                       <th className="px-4 py-2 font-normal">Why</th>
                       <th className="px-4 py-2 font-normal">Decoy record</th>
@@ -106,6 +117,10 @@ export default async function AdaptivePage() {
                         <td className="px-4 py-3 font-mono text-xs">
                           <div>{d.src_ip}</div>
                           {d.session && <div className="max-w-[160px] truncate text-faint">{d.session}</div>}
+                        </td>
+                        <td className="px-4 py-3 font-mono text-xs">
+                          <div>{d.phase || "final"}{d.seq != null ? ` #${d.seq}` : ""}</div>
+                          {d.latency_ms != null && <div className="text-faint">{d.latency_ms}ms</div>}
                         </td>
                         <td className="px-4 py-3 font-mono text-xs">
                           {d.action}

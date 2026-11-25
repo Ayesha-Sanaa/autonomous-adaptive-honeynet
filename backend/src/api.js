@@ -1,4 +1,4 @@
-﻿const http = require("http");
+const http = require("http");
 const { MongoClient } = require("mongodb");
 const { attackersPipeline, sessionsPipeline, shapeAttacker, shapeSession } = require("./analytics");
 const auth = require("./auth");
@@ -340,7 +340,6 @@ function buildServer(db) {
         const docs = await db.collection("adaptive_decisions").find(baseFilter).sort({ timestamp: -1 }).limit(limit).toArray();
         return send(res, 200, docs);
       }
-
       if (path === "/adaptive/stats" && method === "GET") {
         const total = await db.collection("adaptive_decisions").countDocuments(baseFilter);
         const actions = await db.collection("adaptive_decisions").aggregate([
@@ -351,16 +350,39 @@ function buildServer(db) {
         for (const a of actions) {
           if (a._id in actionCounts) actionCounts[a._id] = a.count;
         }
+        const phases = await db.collection("adaptive_decisions").aggregate([
+          { $match: baseFilter },
+          { $group: { _id: { $ifNull: ["$phase", "final"] }, count: { $sum: 1 } } }
+        ]).toArray();
+        const phaseCounts = { live: 0, final: 0 };
+        for (const p of phases) {
+          if (p._id in phaseCounts) phaseCounts[p._id] = p.count;
+        }
+        const liveLatDocs = await db.collection("adaptive_decisions").find(
+          { ...baseFilter, phase: "live", latency_ms: { $type: "number" } },
+          { projection: { latency_ms: 1 } }
+        ).toArray();
+        const lats = liveLatDocs.map((d) => d.latency_ms).sort((a, b) => a - b);
+        const pct = (arr, q) => {
+          if (!arr.length) return null;
+          const idx = Math.min(arr.length - 1, Math.max(0, Math.floor(q * (arr.length - 1))));
+          return arr[idx];
+        };
         const fallbackCount = await db.collection("adaptive_decisions").countDocuments({ ...baseFilter, fallback: true });
         const latest = await db.collection("adaptive_decisions").findOne(baseFilter, { sort: { timestamp: -1 } });
         return send(res, 200, {
           total,
           by_action: actionCounts,
+          by_phase: phaseCounts,
+          live_latency_ms: {
+            count: lats.length,
+            median: pct(lats, 0.5),
+            p95: pct(lats, 0.95),
+          },
           fallback_count: fallbackCount,
           latest_decision: latest ? latest.timestamp : null,
         });
       }
-
 
       if (path === "/events") {
         const filter = { ...baseFilter };
