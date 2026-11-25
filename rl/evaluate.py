@@ -1,4 +1,4 @@
-﻿"""
+"""
 Step 8: compare policies on the simulator.
 Run from the rl folder:  python evaluate.py
 """

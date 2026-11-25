@@ -1,0 +1,19 @@
+Architecture:                       x86_64
+CPU op-mode(s):                     bit-modes: 32-bit, 64-bit
+Address sizes:                      40 bits physical, 48 bits virtual
+Byte Order:                         Little Endian
+CPU(s):                             2
+On-line CPU(s) list:                0,1
+Vendor ID:                          GenuineIntel
+Model name:                         Intel(R) Xeon(R) Gold 6248 CPU @ 2.50GHz
+CPU family:                         6
+Model:                              85
+Thread(s) per core:                 1
+Core(s) per socket:                 2
+Socket(s):                          1
+Hypervisor vendor:                  KVM
+Virtualization type:                full
+L1d cache:                          64 KiB (2 instances)
+L1i cache:                          64 KiB (2 instances)
+L2 cache:                           2 MiB (2 instances)
+L3 cache:                           27.5 MiB (1 instance)

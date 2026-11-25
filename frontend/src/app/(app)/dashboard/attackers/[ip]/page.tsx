@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { api } from "@/lib/api";
-import type { Attacker, EventRow, Session } from "@/lib/types";
+import type { Attacker, EventRow, HoneytokensResponse, Session } from "@/lib/types";
 import { formatNumber, formatTime, isPrivateIp, relativeTime, visible } from "@/lib/format";
 import { CredentialPairs, type Pair } from "@/components/insights";
 import { DecoyBadge, Empty, PageHeader, Panel, ScannerBadge, StatCell, TechniqueChip, decoyLabel } from "@/components/ui";
@@ -29,6 +29,9 @@ type Decision = {
   timestamp: string;
   src_ip: string;
   session: string | null;
+  phase?: string;
+  seq?: number | null;
+  latency_ms?: number | null;
   action: string;
   fallback: boolean;
   top_reasons?: string[];
@@ -64,9 +67,10 @@ export default async function AttackerPage({ params }: { params: Promise<{ ip: s
 
   let decisions: Decision[] = [];
   let shared: SharedIp | null = null;
+  let tokenHits: HoneytokensResponse["recent_hits"] = [];
   try {
     const all = await api<Decision[]>("/adaptive/decisions?limit=100");
-    decisions = all.filter((d) => d.src_ip === ip && !d.synthetic).slice(0, 10);
+    decisions = all.filter((d) => d.src_ip === ip && !d.synthetic).slice(0, 15);
   } catch {
     decisions = [];
   }
@@ -75,6 +79,12 @@ export default async function AttackerPage({ params }: { params: Promise<{ ip: s
     shared = crdt.ips.find((x) => x.ip === ip) ?? null;
   } catch {
     shared = null;
+  }
+  try {
+    const ht = await api<HoneytokensResponse>("/honeytokens");
+    tokenHits = (ht.recent_hits || []).filter((h) => h.src_ip === ip);
+  } catch {
+    tokenHits = [];
   }
 
   const now = Date.now();
@@ -152,11 +162,32 @@ export default async function AttackerPage({ params }: { params: Promise<{ ip: s
               {decisions.map((d) => (
                 <li key={d._id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5">
                   <span className="font-mono text-xs text-muted">{formatTime(d.timestamp)}</span>
+                  <span className="rounded border border-line-strong px-1.5 py-0.5 font-mono text-[11px] text-faint">
+                    {d.phase || "final"}{d.seq != null ? ` #${d.seq}` : ""}{d.latency_ms != null ? ` · ${d.latency_ms}ms` : ""}
+                  </span>
                   <span className="font-mono">{d.action.replace(/_/g, " ")}</span>
                   {d.fallback ? <span className="text-xs text-danger">fallback</span> : null}
                   {d.top_reasons && d.top_reasons.length > 0 ? (
                     <span className="min-w-0 flex-1 truncate text-xs text-faint">{d.top_reasons.join(", ")}</span>
                   ) : null}
+                </li>
+              ))}
+            </ul>
+          )}
+        </Panel>
+
+        <Panel title="Honeytoken hits" hint="leaked credentials used by this IP" flush>
+          {tokenHits.length === 0 ? (
+            <Empty title="No honeytoken hit from this address" />
+          ) : (
+            <ul className="divide-y divide-line text-sm">
+              {tokenHits.map((h, i) => (
+                <li key={i} className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5">
+                  <div>
+                    <span className="font-mono text-xs text-danger">{h.token_id}</span>
+                    <div className="text-xs text-faint">Planted in: {h.planted_in}</div>
+                  </div>
+                  <span className="font-mono text-xs text-muted">{h.decoy} · {formatTime(h.timestamp)}</span>
                 </li>
               ))}
             </ul>

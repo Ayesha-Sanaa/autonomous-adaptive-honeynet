@@ -12,11 +12,13 @@ type Decision = {
   phase?: "live" | "final" | string;
   seq?: number | null;
   latency_ms?: number | null;
+  arm?: string;
+  skill_level?: string;
   action: string;
   fallback: boolean;
   model_version: string;
   top_reasons?: string[];
-  applied_action?: { type?: string; target_decoy?: string };
+  applied_action?: { type?: string; target_decoy?: string; verified?: boolean };
 };
 
 type Stats = {
@@ -63,7 +65,7 @@ export default async function AdaptivePage() {
     <div className="mx-auto max-w-7xl space-y-6">
       <PageHeader
         title="Adaptive Engine"
-        subtitle="Decisions made during open sessions (live) and at session end (final). If the model fails, the system falls back to maintain."
+        subtitle="Decisions made during open sessions (live) and at session end (final). Actions show 'applied' only when verified by Cowrie actuation logs, otherwise 'recorded'."
       />
 
       {failed || !stats ? (
@@ -106,8 +108,8 @@ export default async function AdaptivePage() {
                       <th className="px-4 py-2 font-normal">Phase / seq</th>
                       <th className="px-4 py-2 font-normal">Action</th>
                       <th className="px-4 py-2 font-normal">Why</th>
-                      <th className="px-4 py-2 font-normal">Decoy record</th>
-                      <th className="px-4 py-2 font-normal">Model</th>
+                      <th className="px-4 py-2 font-normal">Effect status</th>
+                      <th className="px-4 py-2 font-normal">Model / Arm</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-line">
@@ -125,15 +127,21 @@ export default async function AdaptivePage() {
                         <td className="px-4 py-3 font-mono text-xs">
                           {d.action}
                           {d.fallback && <span className="ml-2 text-danger">fallback</span>}
+                          {d.skill_level && <div className="text-faint">skill: {d.skill_level}</div>}
                         </td>
                         <td className="px-4 py-3 text-xs">
                           {d.top_reasons?.length ? d.top_reasons.join(" · ") : "-"}
                         </td>
                         <td className="px-4 py-3 text-xs text-muted">
-                          {d.applied_action?.type ?? "-"}
-                          {d.applied_action?.target_decoy ? ` (${d.applied_action.target_decoy})` : ""}
+                          <span className={d.applied_action?.verified ? "text-ok font-medium" : "text-muted"}>
+                            {d.applied_action?.verified ? "applied" : "recorded"}
+                          </span>
+                          {d.applied_action?.type ? ` · ${d.applied_action.type}` : ""}
                         </td>
-                        <td className="px-4 py-3 font-mono text-xs text-faint">{d.model_version}</td>
+                        <td className="px-4 py-3 font-mono text-xs text-faint">
+                          <div>{d.model_version}</div>
+                          {d.arm && <div>{d.arm}</div>}
+                        </td>
                       </tr>
                     ))}
                   </tbody>

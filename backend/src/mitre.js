@@ -60,6 +60,8 @@ const COMMAND_RULES = [
   [/^(sh|bash|dash)\b/, "T1059.004", "low"],
 ];
 
+const WEB_LURE_PATHS = /^\/(\.git\/|backup\.zip|admin\b|wp-login\.php|\.env\b|phpmyadmin)/i;
+
 // "a; b && c | d" becomes ["a", "b", "c", "d"]
 const splitChain = (cmd) => cmd.split(/\s*(?:;|&&|\|\||\||\n)\s*/).filter(Boolean);
 
@@ -71,6 +73,11 @@ function mapAttack(ev) {
   if (ev.event_type === "login_attempt") {
     if (ev.success === true) add("T1078", "medium");
     else if (ev.success === false) add("T1110.001", "low");
+  }
+  if (ev.decoy === "web-portal" && ev.event_type === "request") {
+    if (ev.status === 404 || (ev.path && WEB_LURE_PATHS.test(ev.path))) {
+      add("T1595", "medium");
+    }
   }
   if (ev.event_type === "command" && ev.command) {
     for (const part of splitChain(ev.command.trim())) {

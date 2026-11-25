@@ -32,6 +32,23 @@ spec:
           args: ["--wiredTigerCacheSizeGB", "0.25"]
           ports:
             - containerPort: 27017
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          readinessProbe:
+            tcpSocket:
+              port: 27017
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: 27017
+            initialDelaySeconds: 15
+            periodSeconds: 20
           volumeMounts:
             - name: data
               mountPath: /data/db

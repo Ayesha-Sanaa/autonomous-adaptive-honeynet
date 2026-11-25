@@ -1,0 +1,59 @@
+{
+  "story": "Alder Freight Ltd (invented decoy honeytokens only)",
+  "tokens": [
+    {
+      "id": "ht-db-backup-01",
+      "kind": "credential",
+      "username": "backup",
+      "value": "B4ckup#Alder2024!",
+      "planted_in": "cowrie:/home/admin/backup.sh",
+      "usable_on": ["mariadb", "web-portal", "cowrie"],
+      "for_breadcrumb": false
+    },
+    {
+      "id": "ht-app-db-02",
+      "kind": "credential",
+      "username": "inventory_svc",
+      "value": "InvSvc!94Alder",
+      "planted_in": "cowrie:/opt/inventory-app/config.yml",
+      "usable_on": ["mariadb", "web-portal"],
+      "for_breadcrumb": false
+    },
+    {
+      "id": "ht-portal-dl-03",
+      "kind": "credential",
+      "username": "priya",
+      "value": "AlderFin#2024Nov",
+      "planted_in": "web-portal:/portal/backup-download",
+      "usable_on": ["web-portal", "cowrie", "mariadb"],
+      "for_breadcrumb": false
+    },
+    {
+      "id": "ht-aws-key-04",
+      "kind": "api_key",
+      "username": "aws-backup",
+      "value": "AKIAALDER7FAKE9TOKEN",
+      "planted_in": "cowrie:/home/admin/.aws/credentials (plant_breadcrumb)",
+      "usable_on": ["cowrie", "web-portal"],
+      "for_breadcrumb": true
+    },
+    {
+      "id": "ht-nas-sync-05",
+      "kind": "credential",
+      "username": "backupsvc",
+      "value": "NasSync#Alder05",
+      "planted_in": "cowrie:/home/admin/.nas_token (plant_breadcrumb)",
+      "usable_on": ["cowrie", "web-portal", "heralding"],
+      "for_breadcrumb": true
+    },
+    {
+      "id": "ht-jump-ops-06",
+      "kind": "api_key",
+      "username": "ops-deploy",
+      "value": "alder_pat_98f2FAKE01token",
+      "planted_in": "cowrie:/home/admin/.deploy_token (plant_breadcrumb)",
+      "usable_on": ["cowrie", "web-portal"],
+      "for_breadcrumb": true
+    }
+  ]
+}

@@ -1,9 +1,13 @@
 const http = require("http");
 const { MongoClient } = require("mongodb");
+const { MemoryMongoClient, seedMemoryDb } = require("./memory-db");
 const { attackersPipeline, sessionsPipeline, shapeAttacker, shapeSession } = require("./analytics");
 const auth = require("./auth");
 const { CrdtState } = require("./crdt");
+const { loadHoneytokens } = require("./honeytokens");
 
+const CRDT_TOKEN = process.env.CRDT_TOKEN || "";
+const SIDECAR_URL = process.env.SIDECAR_URL || "http://localhost:5000";
 const CRDT_PEERS = (process.env.CRDT_PEERS ||
   "cowrie=http://cowrie-crdt:7000,web-portal=http://web-portal-crdt:7000,heralding=http://heralding-crdt:7000,dionaea=http://dionaea-crdt:7000")
   .split(",")
@@ -11,13 +15,16 @@ const CRDT_PEERS = (process.env.CRDT_PEERS ||
   .filter((p) => p.length === 2)
   .map(([name, url]) => ({ name, url }));
 
-function getJson(url, timeoutMs = 2000) {
+function getJson(url, timeoutMs = 2000, headers = {}) {
   return new Promise((resolve, reject) => {
-    const req = http.get(url, { timeout: timeoutMs }, (res) => {
+    const req = http.get(url, { timeout: timeoutMs, headers }, (res) => {
       let body = "";
       res.on("data", (c) => (body += c));
       res.on("end", () => {
-        try { resolve(JSON.parse(body)); } catch (e) { reject(e); }
+        try {
+          if (res.statusCode && res.statusCode >= 400) return reject(new Error(`HTTP ${res.statusCode}`));
+          resolve(JSON.parse(body));
+        } catch (e) { reject(e); }
       });
     });
     req.on("timeout", () => req.destroy(new Error("timeout")));
@@ -30,7 +37,8 @@ async function crdtOverview() {
   const nodes = await Promise.all(
     CRDT_PEERS.map(async ({ name, url }) => {
       try {
-        const s = await getJson(`${url}/state`);
+        const hdrs = CRDT_TOKEN ? { "x-crdt-token": CRDT_TOKEN } : {};
+        const s = await getJson(`${url}/state`, 2000, hdrs);
         merged.merge(s);
         return { name, up: true, ips: Object.keys(s.ips || {}).length };
       } catch {
@@ -168,7 +176,10 @@ function buildServer(db) {
 
       if (path === "/health" && method === "GET") return send(res, 200, { ok: true });
 
+      const clientIp = req.headers["x-forwarded-for"] || req.socket.remoteAddress || "unknown";
+
       if (path === "/auth/login" && method === "POST") {
+        auth.checkRateLimit("login", clientIp, 20, 60_000);
         const { username, password } = await readJson(req);
         const session = await auth.login(db, username, password);
         if (!session) return send(res, 401, { error: "invalid username or password" });
@@ -176,6 +187,7 @@ function buildServer(db) {
       }
 
       if (path === "/auth/signup" && method === "POST") {
+        auth.checkRateLimit("signup", clientIp, 10, 300_000);
         const { username, password, reason } = await readJson(req);
         await auth.requestSignup(db, { username, password, reason });
         return send(res, 202, { ok: true });
@@ -233,6 +245,7 @@ function buildServer(db) {
           return send(res, 200, await reports.find({}).sort({ created_at: -1 }).limit(100).toArray());
         }
         if (path === "/reports" && method === "POST") {
+          auth.checkRateLimit("reports", user.username, 20, 60_000);
           const b = await readJson(req);
           const title = String(b.title || "").trim().slice(0, 120);
           const notes = String(b.notes || "").trim().slice(0, 4000);
@@ -437,11 +450,84 @@ function buildServer(db) {
         return send(res, 200, shapeAttacker(docs[0]));
       }
 
+      if (path === "/honeytokens") {
+        const tokens = loadHoneytokens();
+        const hits = await db.collection("honeytoken_hits").find({}).sort({ timestamp: -1 }).limit(100).toArray();
+        const counts = new Map();
+        const lastHitByToken = new Map();
+        for (const h of hits) {
+          counts.set(h.token_id, (counts.get(h.token_id) || 0) + 1);
+          if (!lastHitByToken.has(h.token_id)) lastHitByToken.set(h.token_id, h);
+        }
+        return send(res, 200, {
+          tokens: tokens.map((t) => ({
+            id: t.id,
+            kind: t.kind,
+            username: t.username,
+            planted_in: t.planted_in,
+            usable_on: t.usable_on || [],
+            hit_count: counts.get(t.id) || 0,
+            hit: (counts.get(t.id) || 0) > 0,
+            last_hit: lastHitByToken.get(t.id) || null,
+          })),
+          recent_hits: hits.slice(0, 20),
+        });
+      }
+
+      if (path === "/ops") {
+        const totalDecisions = await db.collection("adaptive_decisions").countDocuments({});
+        const fallbackCount = await db.collection("adaptive_decisions").countDocuments({ fallback: true });
+        const liveLatDocs = await db.collection("adaptive_decisions").find(
+          { phase: "live", latency_ms: { $type: "number" } },
+          { projection: { latency_ms: 1 } }
+        ).toArray();
+        const lats = liveLatDocs.map((d) => d.latency_ms).sort((a, b) => a - b);
+        const pct = (arr, q) => (arr.length ? arr[Math.min(arr.length - 1, Math.floor(q * (arr.length - 1)))] : null);
+        const sources = await db.collection("collector_status").find({}).toArray();
+        const crdt = await crdtOverview();
+        let sidecar = { status: "unreachable", model_loaded: false };
+        try {
+          sidecar = await getJson(`${SIDECAR_URL}/health`, 1500);
+        } catch { /* unreachable */ }
+        const backupMeta = await db.collection("ops_meta").findOne({ _id: "last_backup" });
+        const lastBackupAgeSec = backupMeta?.timestamp
+          ? Math.round((Date.now() - new Date(backupMeta.timestamp).getTime()) / 1000)
+          : null;
+        return send(res, 200, {
+          decision_latency_ms: { count: lats.length, median: pct(lats, 0.5), p95: pct(lats, 0.95) },
+          fallback_rate: totalDecisions > 0 ? Number((fallbackCount / totalDecisions).toFixed(4)) : 0,
+          total_decisions: totalDecisions,
+          fallback_count: fallbackCount,
+          collector_sources: sources.map((s) => ({
+            decoy: s.decoy,
+            offset: s.offset,
+            last_poll_at: s.last_poll_at,
+            last_event_at: s.last_event_at || null,
+            lag_s: s.last_poll_at ? Math.round((Date.now() - new Date(s.last_poll_at).getTime()) / 1000) : null,
+          })),
+          sidecar,
+          crdt,
+          last_backup_at: backupMeta?.timestamp || null,
+          last_backup_age_s: lastBackupAgeSec,
+        });
+      }
+
       if (path === "/sessions") {
         const limit = Math.min(Number(url.searchParams.get("limit")) || 50, 200);
         const pipeline = [{ $match: baseFilter }, ...sessionsPipeline(limit)];
         const docs = await events.aggregate(pipeline).toArray();
-        return send(res, 200, docs.map(shapeSession));
+        const ids = docs.map((d) => d._id);
+        const metas = await db.collection("session_meta").find({ _id: { $in: ids } }).toArray();
+        const metaMap = new Map(metas.map((m) => [m._id, m]));
+        return send(res, 200, docs.map((d) => {
+          const shaped = shapeSession(d);
+          const m = metaMap.get(d._id);
+          if (m) {
+            shaped.actor = { actor_type: m.actor_type, confidence: m.confidence, reasons: m.reasons, skill_level: m.skill_level };
+            shaped.arm = m.arm || null;
+          }
+          return shaped;
+        }));
       }
 
       if (path.startsWith("/sessions/")) {
@@ -451,7 +537,13 @@ function buildServer(db) {
         const pipeline = [{ $match: filter }, ...sessionsPipeline(1)];
         const docs = await events.aggregate(pipeline).toArray();
         if (!docs.length) return send(res, 404, { error: "session not found" });
-        return send(res, 200, shapeSession(docs[0]));
+        const shaped = shapeSession(docs[0]);
+        const m = await db.collection("session_meta").findOne({ _id: sessionId });
+        if (m) {
+          shaped.actor = { actor_type: m.actor_type, confidence: m.confidence, reasons: m.reasons, skill_level: m.skill_level };
+          shaped.arm = m.arm || null;
+        }
+        return send(res, 200, shaped);
       }
 
       send(res, 404, { error: "not found" });
@@ -467,11 +559,21 @@ function buildServer(db) {
 }
 
 async function main() {
-  const client = new MongoClient(MONGO_URL);
-  await client.connect();
-  const db = client.db("honeynet");
-  await auth.ensureIndexes(db);
-  buildServer(db).listen(PORT, () => console.log(`api listening on ${PORT}`));
+  let client, db;
+  try {
+    client = new MongoClient(MONGO_URL, { serverSelectionTimeoutMS: 2000 });
+    await client.connect();
+    db = client.db("honeynet");
+    await auth.ensureIndexes(db);
+    console.log("Connected to MongoDB");
+  } catch (err) {
+    console.warn("MongoDB connection failed, falling back to in-memory mock database:", err.message);
+    client = new MemoryMongoClient();
+    await client.connect();
+    db = client.db("honeynet");
+    await seedMemoryDb(db);
+  }
+  buildServer(db).listen(PORT, '0.0.0.0', () => console.log(`api listening on ${PORT}`));
 }
 
 if (require.main === module) main();

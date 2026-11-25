@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  SquaresFour, Pulse, Crosshair, TerminalWindow, Target, HardDrives, GearSix, Sparkle,ShareNetwork,FileText, SignOut,
+  SquaresFour, Pulse, Crosshair, TerminalWindow, Target, HardDrives, GearSix, Sparkle, ShareNetwork, FileText, Gauge, SignOut,
 } from "@phosphor-icons/react";
 import { Brand } from "./logo";
 import { logout } from "@/app/actions";
@@ -19,6 +19,7 @@ const NAV = [
   { href: "/dashboard/decoys", label: "Decoys", icon: HardDrives },
   { href: "/dashboard/adaptive", label: "Adaptive Engine", icon: Sparkle },
   { href: "/dashboard/crdt", label: "Shared State", icon: ShareNetwork },
+  { href: "/dashboard/ops", label: "Operations", icon: Gauge },
   { href: "/dashboard/reports", label: "Reports", icon: FileText },
 ];
 const SETTINGS = { href: "/dashboard/settings", label: "Settings", icon: GearSix };

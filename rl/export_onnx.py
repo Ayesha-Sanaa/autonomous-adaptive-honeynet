@@ -1,4 +1,4 @@
-﻿"""
+"""
 Export the trained PPO model to ONNX and verify it.
 The check compares the logits (not only the top action) on the test vectors and on 300 random inputs.
 Run from the rl folder:  python export_onnx.py

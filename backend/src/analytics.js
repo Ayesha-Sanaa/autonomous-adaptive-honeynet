@@ -1,4 +1,4 @@
-﻿const { scanTechnique } = require("./mitre");
+const { scanTechnique } = require("./mitre");
 
 // One row per attacker IP (or filtered by specific IP and/or demo mode)
 const attackersPipeline = (limit, matchQuery = { src_ip: { $ne: null } }) => [

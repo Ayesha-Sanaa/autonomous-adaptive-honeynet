@@ -20,19 +20,43 @@ spec:
           command: ["node", "collector.js"]
           env:
             - name: MONGO_URL
-              value: mongodb://mongodb:27017
+              valueFrom:
+                secretKeyRef:
+                  name: honeynet-secrets
+                  key: mongo-url
+                  optional: true
             - name: SIDECAR_URL
               value: http://rl-sidecar:5000
             - name: ACTUATOR_URL
               value: http://cowrie-actuator:7100
             - name: LIVE_ACTIONS
               value: "1"
+            - name: OFFSETS_FILE
+              value: /data/collector-offsets.json
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests:
+              cpu: 50m
+              memory: 96Mi
+            limits:
+              cpu: 300m
+              memory: 256Mi
           volumeMounts:
             - name: logs
               mountPath: /logs
               readOnly: true
+            - name: offsets
+              mountPath: /data
       volumes:
         - name: logs
           hostPath:
             path: /logs
             type: Directory
+        - name: offsets
+          hostPath:
+            path: /logs/collector-state
+            type: DirectoryOrCreate

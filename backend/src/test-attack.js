@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Scripted Fake Attack Test for Step 6.
  */
 const { MongoClient } = require("mongodb");

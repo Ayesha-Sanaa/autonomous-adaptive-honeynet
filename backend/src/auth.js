@@ -17,6 +17,18 @@ const MAX_PENDING = 50; // account requests waiting for an admin
 const REQUEST_DAYS = 14; // an unanswered request is deleted after this many days
 const SIGNUPS_PER_HOUR = 10; // across everyone: the website calls the API from one address, so this is one shared limit
 const recentSignups = [];
+const rateBuckets = new Map();
+
+function checkRateLimit(bucket, key, limit = 15, windowMs = 60_000) {
+  const now = Date.now();
+  const k = `${bucket}:${key || "unknown"}`;
+  const arr = (rateBuckets.get(k) || []).filter((t) => t > now - windowMs);
+  if (arr.length >= limit) {
+    throw new HttpError(429, "too many requests, try again shortly");
+  }
+  arr.push(now);
+  rateBuckets.set(k, arr);
+}
 
 class HttpError extends Error {
   constructor(status, message) {
@@ -68,6 +80,7 @@ async function ensureIndexes(db) {
   await db.collection("sessions").createIndex({ expires_at: 1 }, { expireAfterSeconds: 0 }); // Mongo deletes expired sessions itself
   await db.collection("sessions").createIndex({ username: 1 });
   await db.collection("signup_requests").createIndex({ expires_at: 1 }, { expireAfterSeconds: 0 });
+  await db.collection("login_failures").createIndex({ expires_at: 1 }, { expireAfterSeconds: 0 });
   await db.collection("audit").createIndex({ time: -1 });
 }
 
@@ -99,6 +112,11 @@ async function login(db, username, password) {
   const passwordOk = await verifyPassword(String(password ?? ""), user ? user.password : await getDummy());
 
   if (!user || locked || !passwordOk) {
+    await db.collection("login_failures").insertOne({
+      username: u || "unknown",
+      created_at: new Date(),
+      expires_at: new Date(Date.now() + LOCK_MINUTES * 60000),
+    });
     if (user && !locked) {
       const fails = (user.failed_logins || 0) + 1;
       if (fails >= MAX_FAILS) {
@@ -230,6 +248,6 @@ async function listAudit(db, limit = 20) {
 }
 
 module.exports = {
-  HttpError, ROLES, ensureIndexes, hashPassword, verifyPassword, createUser, login, sessionUser, logout, changePassword,
+  HttpError, ROLES, ensureIndexes, checkRateLimit, hashPassword, verifyPassword, createUser, login, sessionUser, logout, changePassword,
   listUsers, deleteUser, requestSignup, listRequests, approveRequest, rejectRequest, setRole, listAudit,
 };

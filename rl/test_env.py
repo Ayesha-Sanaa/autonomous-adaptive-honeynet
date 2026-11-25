@@ -1,4 +1,4 @@
-﻿"""
+"""
 Test script for HoneynetEnv.
 Executes random actions over multiple episodes and computes the average reward.
 """

@@ -1,0 +1,10 @@
+{
+  "ps": [
+    {"PID": 1, "USER": "root", "STAT": "Ss", "TIME": "0:04", "COMMAND": "/sbin/init"},
+    {"PID": 412, "USER": "root", "STAT": "Ss", "TIME": "0:01", "COMMAND": "/lib/systemd/systemd-journald"},
+    {"PID": 519, "USER": "root", "STAT": "Ss", "TIME": "0:00", "COMMAND": "sshd: /usr/sbin/sshd -D [listener] 0 of 10-100 startups"},
+    {"PID": 612, "USER": "root", "STAT": "Ss", "TIME": "0:02", "COMMAND": "/usr/sbin/cron -f"},
+    {"PID": 844, "USER": "www-data", "STAT": "S", "TIME": "0:03", "COMMAND": "node /opt/inventory-app/server.js"},
+    {"PID": 1024, "USER": "admin", "STAT": "Ss", "TIME": "0:00", "COMMAND": "-bash"}
+  ]
+}

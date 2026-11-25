@@ -1,5 +1,6 @@
 const fs = require("fs");
 const http = require("http");
+const path = require("path");
 const { CrdtState } = require("./crdt");
 const { parseCsvLine } = require("./records");
 
@@ -11,11 +12,33 @@ const NORMALIZER = process.env.NORMALIZER || "";
 const SYNC_MS = Number(process.env.SYNC_MS || 3000);
 const POLL_MS = Number(process.env.POLL_MS || 2000);
 const PEERS = (process.env.PEERS || "").split(",").map((s) => s.trim()).filter(Boolean);
+const CRDT_TOKEN = process.env.CRDT_TOKEN || "";
+const STATE_FILE = process.env.STATE_FILE || `/logs/crdt-state/${NODE}.json`;
 
 const state = new CrdtState(NODE);
 const normalize = NORMALIZER ? require(`./normalizers/${NORMALIZER}`) : null;
 let offset = 0;
 let header = null;
+
+function loadPersistedState() {
+  try {
+    if (!fs.existsSync(STATE_FILE)) return;
+    const saved = JSON.parse(fs.readFileSync(STATE_FILE, "utf8"));
+    if (saved && saved.ips) state.merge(saved);
+    console.log(`crdt sidecar ${NODE}: restored state from ${STATE_FILE}`);
+  } catch (err) {
+    console.warn(`crdt sidecar ${NODE}: could not load state:`, err.message);
+  }
+}
+
+function savePersistedState() {
+  try {
+    fs.mkdirSync(path.dirname(STATE_FILE), { recursive: true });
+    fs.writeFileSync(STATE_FILE, JSON.stringify(state.toJSON()), "utf8");
+  } catch {
+    // Volume may be read-only unless /logs/crdt-state is mounted writable
+  }
+}
 
 function levelOf(n) {
   if (n.event_type === "command") return 4;
@@ -59,11 +82,14 @@ function tail() {
 
 function pullPeer(url) {
   return new Promise((resolve) => {
-    const req = http.get(`${url}/state`, { timeout: 2000 }, (res) => {
+    const headers = CRDT_TOKEN ? { "x-crdt-token": CRDT_TOKEN } : {};
+    const req = http.get(`${url}/state`, { timeout: 2000, headers }, (res) => {
       let body = "";
       res.on("data", (c) => (body += c));
       res.on("end", () => {
-        try { state.merge(JSON.parse(body)); } catch { /* ignore */ }
+        try {
+          if (res.statusCode === 200) state.merge(JSON.parse(body));
+        } catch { /* ignore */ }
         resolve();
       });
     });
@@ -80,20 +106,30 @@ function readBody(req) {
   });
 }
 
+function authorized(req) {
+  if (!CRDT_TOKEN) return true;
+  return req.headers["x-crdt-token"] === CRDT_TOKEN;
+}
+
 const server = http.createServer(async (req, res) => {
   const send = (code, obj) => {
     res.writeHead(code, { "Content-Type": "application/json" });
     res.end(JSON.stringify(obj));
   };
   if (req.method === "GET" && req.url === "/health") return send(200, { status: "ok", node: NODE });
-  if (req.method === "GET" && req.url === "/state") return send(200, state.toJSON());
+  if (req.method === "GET" && req.url === "/state") {
+    if (!authorized(req)) return send(401, { error: "unauthorized" });
+    return send(200, state.toJSON());
+  }
   if (req.method === "POST" && req.url === "/merge") {
+    if (!authorized(req)) return send(401, { error: "unauthorized" });
     const body = await readBody(req);
     if (!body) return send(400, { error: "bad json" });
     state.merge(body);
     return send(200, { ok: true });
   }
   if (req.method === "POST" && req.url === "/observe") {
+    if (!authorized(req)) return send(401, { error: "unauthorized" });
     const body = await readBody(req);
     if (!body || !body.ip) return send(400, { error: "ip required" });
     state.observe(body.ip, { level: body.level || 1, ts: body.ts || Date.now(), decoy: NODE });
@@ -102,6 +138,14 @@ const server = http.createServer(async (req, res) => {
   send(404, { error: "not found" });
 });
 
+loadPersistedState();
 server.listen(PORT, () => console.log(`crdt sidecar ${NODE} on ${PORT}, peers: ${PEERS.join(",") || "none"}`));
 setInterval(tail, POLL_MS);
 setInterval(() => { PEERS.forEach((p) => pullPeer(p)); }, SYNC_MS);
+setInterval(savePersistedState, 10_000);
+for (const sig of ["SIGINT", "SIGTERM"]) {
+  process.on(sig, () => {
+    savePersistedState();
+    process.exit(0);
+  });
+}
