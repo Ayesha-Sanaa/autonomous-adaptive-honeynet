@@ -34,6 +34,12 @@ function matchHoneytoken(ev) {
     ["command", ev.command],
   ];
   for (const t of tokens) {
+    if (ev.decoy === "mariadb" && ev.event_type === "login_attempt" && ev.username) {
+      const usable = Array.isArray(t.usable_on) && t.usable_on.includes("mariadb");
+      if (usable && t.username && ev.username === t.username) {
+        return { id: t.id, planted_in: t.planted_in, kind: t.kind, matched_field: "username" };
+      }
+    }
     if (!t.value) continue;
     for (const [fieldName, fieldVal] of fields) {
       if (typeof fieldVal === "string" && fieldVal.includes(t.value)) {

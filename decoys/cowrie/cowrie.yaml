@@ -24,7 +24,7 @@ spec:
               mountPath: /scripts
               readOnly: true
             - name: honeytokens
-              mountPath: /scripts/honeytokens.json
+              mountPath: /tokens/honeytokens.json
               subPath: honeytokens.json
               readOnly: true
       containers:

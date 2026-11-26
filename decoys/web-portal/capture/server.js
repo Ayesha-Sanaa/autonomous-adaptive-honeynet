@@ -137,6 +137,10 @@ function layout(title, user, body) {
 
 const server = http.createServer((req, res) => {
   const urlPath = (req.url || "/").split("?")[0];
+  if (urlPath === "/healthz" && req.method === "GET") {
+    res.writeHead(200, { "Content-Type": "text/plain" });
+    return res.end("ok\n");
+  }
   const srcIp = getIp(req);
   const ua = req.headers["user-agent"] || "";
   let body = "";

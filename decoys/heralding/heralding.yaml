@@ -16,6 +16,9 @@ spec:
       containers:
         - name: heralding
           image: dtagdevsec/heralding:24.04.1
+          command: ["/bin/sh", "-c"]
+          args:
+            - "sed 's/public_ip_as_destination_ip: true/public_ip_as_destination_ip: false/' /etc/heralding/heralding.yml > /tmp/heralding/heralding.yml && exec heralding -c /tmp/heralding/heralding.yml"
           ports:
             - containerPort: 21
           resources:
@@ -25,6 +28,11 @@ spec:
             limits:
               cpu: 200m
               memory: 256Mi
+          startupProbe:
+            tcpSocket:
+              port: 21
+            periodSeconds: 10
+            failureThreshold: 30
           readinessProbe:
             tcpSocket:
               port: 21

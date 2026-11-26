@@ -30,16 +30,18 @@ spec:
               memory: 192Mi
           readinessProbe:
             httpGet:
-              path: /robots.txt
+              path: /healthz
               port: 3000
             initialDelaySeconds: 3
             periodSeconds: 10
+            timeoutSeconds: 3
           livenessProbe:
             httpGet:
-              path: /robots.txt
+              path: /healthz
               port: 3000
             initialDelaySeconds: 10
             periodSeconds: 20
+            timeoutSeconds: 3
           volumeMounts:
             - name: code
               mountPath: /app

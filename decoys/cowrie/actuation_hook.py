@@ -113,14 +113,32 @@ def consume_and_apply(shell):
             delay = round(random.uniform(0.3, 1.2), 3)
             _log_actuation(sid, action, seq, {"type": "delay", "delay_s": delay})
         elif action == "plant_breadcrumb" and fs is not None:
-            planted_path = data.get("planted_path") or "/home/admin/.aws/credentials"
+            planted_path = str(data.get("planted_path") or "/home/admin/.aws/credentials")
+            if not planted_path.startswith("/home/"):
+                planted_path = "/home/admin/.aws/credentials"
             token_val = data.get("token_value") or "AKIAALDER7FAKE9TOKEN"
             token_id = data.get("token_id") or "ht-aws-key-04"
-            content = (
-                "[default]\n"
-                f"aws_access_key_id = {token_val}\n"
-                "aws_secret_access_key = alder-decoy-secret-not-real\n"
-            )
+            token_kind = str(data.get("token_kind") or "api_key")
+            token_user = str(data.get("token_username") or "backupsvc")
+            if ".aws" in planted_path:
+                content = (
+                    "[default]\n"
+                    f"aws_access_key_id = {token_val}\n"
+                    "aws_secret_access_key = alder-decoy-secret-not-real\n"
+                )
+            elif token_kind == "credential" or "nas" in planted_path:
+                content = (
+                    "# Alder Freight NAS sync credentials\n"
+                    "NAS_HOST=10.20.0.30\n"
+                    f"NAS_USER={token_user}\n"
+                    f"NAS_PASS={token_val}\n"
+                )
+            else:
+                content = (
+                    "# Alder Freight ops deploy token\n"
+                    f"DEPLOY_USER={token_user}\n"
+                    f"DEPLOY_TOKEN={token_val}\n"
+                )
             _write_virtual_file(fs, planted_path, content)
             _log_actuation(
                 sid,

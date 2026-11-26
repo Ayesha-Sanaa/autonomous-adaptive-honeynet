@@ -559,20 +559,11 @@ function buildServer(db) {
 }
 
 async function main() {
-  let client, db;
-  try {
-    client = new MongoClient(MONGO_URL, { serverSelectionTimeoutMS: 2000 });
-    await client.connect();
-    db = client.db("honeynet");
-    await auth.ensureIndexes(db);
-    console.log("Connected to MongoDB");
-  } catch (err) {
-    console.warn("MongoDB connection failed, falling back to in-memory mock database:", err.message);
-    client = new MemoryMongoClient();
-    await client.connect();
-    db = client.db("honeynet");
-    await seedMemoryDb(db);
-  }
+  const client = new MongoClient(MONGO_URL, { serverSelectionTimeoutMS: 5000 });
+  await client.connect();
+  const db = client.db("honeynet");
+  await auth.ensureIndexes(db);
+  console.log("Connected to MongoDB");
   buildServer(db).listen(PORT, '0.0.0.0', () => console.log(`api listening on ${PORT}`));
 }
 

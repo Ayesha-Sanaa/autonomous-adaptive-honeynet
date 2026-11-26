@@ -9,6 +9,7 @@ NOW = time.time()
 DAY = 86400
 
 TOKEN_CANDIDATES = [
+    "/tokens/honeytokens.json",
     "/scripts/honeytokens.json",
     os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "honeytokens.json"),
     "/decoys/honeytokens.json",

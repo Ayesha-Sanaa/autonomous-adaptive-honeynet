@@ -210,7 +210,7 @@ spec:
             matchExpressions:
               - key: app
                 operator: In
-                values: [cowrie, dionaea, heralding, web-portal]
+                values: [cowrie, dionaea, heralding, web-portal, mariadb]
       ports:
         - protocol: TCP
           port: 2222
@@ -222,6 +222,8 @@ spec:
           port: 23
         - protocol: TCP
           port: 445
+        - protocol: TCP
+          port: 3306
     - to:
         - namespaceSelector:
             matchLabels:
@@ -271,6 +273,25 @@ spec:
               - key: app
                 operator: In
                 values: [haproxy, cowrie, collector]
+      ports:
+        - protocol: TCP
+          port: 3306
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: cowrie-egress-to-mariadb
+  namespace: honeynet
+spec:
+  podSelector:
+    matchLabels:
+      app: cowrie
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: mariadb
       ports:
         - protocol: TCP
           port: 3306

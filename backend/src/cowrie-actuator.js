@@ -55,10 +55,13 @@ const server = http.createServer((req, res) => {
           usedTokensBySession.set(sid, used);
           record.token_id = tok.id;
           record.token_value = tok.value;
+          record.token_kind = tok.kind || "api_key";
+          record.token_username = tok.username || "";
           record.planted_path = "/home/admin/.aws/credentials";
           if (tok.planted_in && tok.planted_in.includes(":/")) {
-            record.planted_path = tok.planted_in.split(":/")[1].split(" ")[0];
-            if (!record.planted_path.startsWith("/")) record.planted_path = "/" + record.planted_path;
+            let candidate = tok.planted_in.split(":/")[1].split(" ")[0];
+            if (!candidate.startsWith("/")) candidate = "/" + candidate;
+            if (candidate.startsWith("/home/")) record.planted_path = candidate;
           }
         }
 
