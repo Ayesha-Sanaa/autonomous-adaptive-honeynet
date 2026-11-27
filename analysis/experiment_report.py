@@ -92,7 +92,7 @@ def extract_rows_from_mongo(mongo_url: str):
         ht_hits = sum(1 for e in evs if e.get("honeytoken"))
         meta = metas.get(sid, {})
         decs = decisions_by_sess.get(sid, [])
-        arm = meta.get("arm") or (decs[0].get("arm") if decs else "unknown")
+        arm = meta.get("arm") or next((d.get("arm") for d in decs if d.get("arm")), None) or "unknown"
         dur = 0
         if len(evs) >= 2 and evs[0].get("timestamp") and evs[-1].get("timestamp"):
             dur = max(0, round((evs[-1]["timestamp"] - evs[0]["timestamp"]).total_seconds(), 2))
