@@ -19,6 +19,7 @@ spec:
           command: ["node", "/app/server.js"]
           securityContext:
             allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
             capabilities:
               drop: ["ALL"]
           resources:

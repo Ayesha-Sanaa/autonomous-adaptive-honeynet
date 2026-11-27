@@ -21,6 +21,12 @@ spec:
             - "sed 's/public_ip_as_destination_ip: true/public_ip_as_destination_ip: false/' /etc/heralding/heralding.yml > /tmp/heralding/heralding.yml && exec heralding -c /tmp/heralding/heralding.yml"
           ports:
             - containerPort: 21
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+              add: ["NET_BIND_SERVICE"]
           resources:
             requests:
               cpu: 30m
@@ -72,11 +78,12 @@ spec:
                 secretKeyRef:
                   name: honeynet-secrets
                   key: crdt-token
-                  optional: true
+                  optional: false
           ports:
             - containerPort: 7000
           securityContext:
             allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
             capabilities:
               drop: ["ALL"]
           resources:

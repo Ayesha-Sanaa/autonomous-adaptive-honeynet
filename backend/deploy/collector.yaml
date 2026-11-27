@@ -24,7 +24,7 @@ spec:
                 secretKeyRef:
                   name: honeynet-secrets
                   key: mongo-url
-                  optional: true
+                  optional: false
             - name: SIDECAR_URL
               value: http://rl-sidecar:5000
             - name: ACTUATOR_URL

@@ -32,7 +32,7 @@ spec:
                     secretKeyRef:
                       name: honeynet-secrets
                       key: mongo-url
-                      optional: true
+                      optional: false
               command:
                 - /bin/sh
                 - -c

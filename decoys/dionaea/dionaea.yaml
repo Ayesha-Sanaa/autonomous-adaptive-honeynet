@@ -21,6 +21,11 @@ spec:
               value: "1"
           ports:
             - containerPort: 445
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+              add: ["NET_BIND_SERVICE", "SETUID", "SETGID", "CHOWN", "DAC_OVERRIDE"]
           resources:
             requests:
               cpu: 50m
@@ -68,11 +73,12 @@ spec:
                 secretKeyRef:
                   name: honeynet-secrets
                   key: crdt-token
-                  optional: true
+                  optional: false
           ports:
             - containerPort: 7000
           securityContext:
             allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
             capabilities:
               drop: ["ALL"]
           resources:

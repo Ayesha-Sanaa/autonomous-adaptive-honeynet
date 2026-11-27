@@ -49,6 +49,10 @@ spec:
               value: /actions
           ports:
             - containerPort: 2222
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
           resources:
             requests:
               cpu: 100m
@@ -136,6 +140,7 @@ spec:
             - containerPort: 7100
           securityContext:
             allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
             capabilities:
               drop: ["ALL"]
           resources:
@@ -178,11 +183,12 @@ spec:
                 secretKeyRef:
                   name: honeynet-secrets
                   key: crdt-token
-                  optional: true
+                  optional: false
           ports:
             - containerPort: 7000
           securityContext:
             allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
             capabilities:
               drop: ["ALL"]
           resources:
