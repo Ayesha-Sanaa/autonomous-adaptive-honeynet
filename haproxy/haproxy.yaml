@@ -22,7 +22,6 @@ spec:
             - containerPort: 2121
             - containerPort: 2323
             - containerPort: 4445
-            - containerPort: 3306
           resources:
             requests:
               cpu: 50m
@@ -79,7 +78,3 @@ spec:
       port: 4445
       targetPort: 4445
       nodePort: 30445
-    - name: mysql
-      port: 3306
-      targetPort: 3306
-      nodePort: 30306

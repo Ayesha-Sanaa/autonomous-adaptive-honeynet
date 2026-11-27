@@ -6,7 +6,6 @@ resources:
   - decoys/web-portal/web-portal.yaml
   - decoys/heralding/heralding.yaml
   - decoys/dionaea/dionaea.yaml
-  - decoys/mariadb/mariadb.yaml
   - backend/deploy/mongodb.yaml
   - backend/deploy/mongodb-backup-cronjob.yaml
   - backend/deploy/collector.yaml

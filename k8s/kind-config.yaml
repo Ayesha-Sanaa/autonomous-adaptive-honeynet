@@ -21,6 +21,3 @@ nodes:
       - containerPort: 30445
         hostPort: 4445
         listenAddress: "127.0.0.1"
-      - containerPort: 30306
-        hostPort: 3306
-        listenAddress: "127.0.0.1"
