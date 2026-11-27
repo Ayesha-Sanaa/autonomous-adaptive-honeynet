@@ -1,4 +1,4 @@
-"""
+﻿"""
 Step 3: PPO Training Script for Autonomous Adaptive Honeynet.
 Uses stable-baselines3 (PPO with MlpPolicy).
 Trains on HoneynetEnv, saves model to rl/ppo_honeynet.zip,
