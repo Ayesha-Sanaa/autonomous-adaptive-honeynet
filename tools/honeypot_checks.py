@@ -49,7 +49,7 @@ def main():
     banner = grab_banner(args.host, args.port)
     client = paramiko.SSHClient()
     client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-    client.connect(args.host, port=args.port, username=args.user, password=args.password, timeout=10)
+    client.connect(args.host, port=args.port, username=args.user, password=args.password, timeout=10, allow_agent=False, look_for_keys=False)
     shell = client.invoke_shell()
     time.sleep(0.5)
     if shell.recv_ready():

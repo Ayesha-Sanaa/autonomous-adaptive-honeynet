@@ -216,6 +216,11 @@ add_file(var_log, "syslog", SYSLOG, 0, 4, mode=0o100640, age=2)
 nginx_log = ensure_path(fs, ["var", "log", "nginx"])
 add_file(nginx_log, "access.log", NGINX_ACCESS, 0, 4, mode=0o100640, age=2)
 
+for parts, cmd in [(["bin"],"df"),(["bin"],"netstat"),(["usr","bin"],"systemctl"),(["usr","bin"],"ip"),(["usr","bin"],"crontab"),(["usr","bin"],"free"),(["usr","bin"],"lscpu"),(["usr","bin"],"mysql")]:
+    parent = ensure_path(fs, parts)
+    if not child(parent, cmd):
+        add_file(parent, cmd, b"", 0, 0, mode=0o100755, age=180, size=65536)
+
 with open(DST, "wb") as f:
     pickle.dump(fs, f)
 

@@ -7,19 +7,20 @@ Usage inside Cowrie container or against an extracted honeypot.py:
   python3 tools/patch_cowrie_honeypot.py /path/to/honeypot.py /path/to/honeypot.patched.py
 """
 
+import py_compile
 import sys
 
-TARGET_NEEDLE = "        self.runCommand()"
-REPLACEMENT = """        try:
-            import actuation_hook
-            _gn_delay = actuation_hook.consume_and_apply(self)
-        except Exception:
-            _gn_delay = 0.0
-        if _gn_delay > 0:
-            from twisted.internet import reactor
-            reactor.callLater(_gn_delay, self.runCommand)
-            return
-        self.runCommand()"""
+TARGET_NEEDLE = "                    self.runCommand()"
+REPLACEMENT = """                    try:
+                        from cowrie.shell import actuation_hook
+                        _gn_delay = actuation_hook.consume_and_apply(self)
+                    except Exception:
+                        _gn_delay = 0.0
+                    if _gn_delay > 0:
+                        from twisted.internet import reactor
+                        reactor.callLater(_gn_delay, self._advance)
+                        return
+                    self.runCommand()"""
 
 
 def patch_file(src_path: str, dst_path: str):
@@ -30,18 +31,21 @@ def patch_file(src_path: str, dst_path: str):
         print("Already patched.")
         with open(dst_path, "w", encoding="utf-8") as f:
             f.write(text)
+        py_compile.compile(dst_path, doraise=True)
         return
 
-    if TARGET_NEEDLE not in text:
+    count = text.count(TARGET_NEEDLE)
+    if count != 1:
         raise RuntimeError(
-            f"Expected hook target '{TARGET_NEEDLE}' not found in {src_path}. "
+            f"Expected exactly 1 occurrence of '{TARGET_NEEDLE}' in {src_path}, found {count}. "
             "VERIFY exact line in pinned Cowrie pod before applying."
         )
 
     patched = text.replace(TARGET_NEEDLE, REPLACEMENT, 1)
     with open(dst_path, "w", encoding="utf-8") as f:
         f.write(patched)
-    print(f"Patched honeypot.py written to {dst_path}")
+    py_compile.compile(dst_path, doraise=True)
+    print(f"Patched honeypot.py written and verified with py_compile: {dst_path}")
 
 
 if __name__ == "__main__":

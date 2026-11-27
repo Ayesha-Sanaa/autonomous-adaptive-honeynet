@@ -75,23 +75,56 @@ def _log_actuation(session: str, action: str, seq, effect: dict):
         pass
 
 
+def _log_error(err: Exception, session: str = "unknown"):
+    record = {
+        "eventid": "cowrie.actuation.error",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "session": str(session),
+        "error": f"{type(err).__name__}: {err}",
+    }
+    try:
+        os.makedirs(os.path.dirname(ACTUATION_LOG), exist_ok=True)
+        with open(ACTUATION_LOG, "a", encoding="utf-8") as f:
+            f.write(json.dumps(record) + "\n")
+    except Exception:
+        pass
+
+
+def _get_session_id(shell) -> str:
+    proto = getattr(shell, "protocol", None)
+    events = getattr(proto, "events", None)
+    ident = getattr(events, "identity", None)
+    if isinstance(ident, dict) and ident.get("session"):
+        return str(ident["session"])
+    get_pt = getattr(proto, "getProtoTransport", None)
+    if callable(get_pt):
+        try:
+            pt = get_pt()
+            tid = getattr(getattr(pt, "transport", None), "transportId", None) or getattr(pt, "transportId", None)
+            if tid:
+                return str(tid)
+        except Exception:
+            pass
+    for obj in (proto, getattr(proto, "transport", None)):
+        tid = getattr(obj, "transportId", None)
+        if tid:
+            return str(tid)
+    sno = getattr(proto, "sessionno", None)
+    return str(sno) if sno is not None else "unknown"
+
+
 def consume_and_apply(shell):
     """
     Inspect /actions/<session>.json for the active Cowrie shell.
     Returns delay_seconds (float) if observe_only delay should be scheduled.
     """
+    sid = "unknown"
     try:
-        session_id = getattr(shell.protocol.transport, "sessionno", None)
-        if hasattr(shell.protocol, "log") and hasattr(shell.protocol.log, "session"):
-            session_id = shell.protocol.log.session
-        # Cowrie stores the hex session id on transport.session.id or protocol.sessionId (VERIFY in pod)
-        sid = (
-            getattr(shell.protocol, "sessionId", None)
-            or getattr(getattr(shell.protocol, "transport", None), "sessionno", None)
-            or session_id
-            or "unknown"
-        )
-        sid = str(sid)
+        sid = _get_session_id(shell)
+        cmdpending = getattr(shell, "cmdpending", None) or []
+        cur_cmd_id = id(cmdpending[0]) if cmdpending else None
+        if cur_cmd_id is not None and getattr(shell, "_guardnet_delayed_cmd_id", None) == cur_cmd_id:
+            return 0.0
         action_path = os.path.join(ACTIONS_DIR, f"{_safe_session(sid)}.json")
         if not os.path.exists(action_path):
             return 0.0
@@ -110,12 +143,22 @@ def consume_and_apply(shell):
         delay = 0.0
 
         if action == "observe_only":
+            if cur_cmd_id is not None:
+                shell._guardnet_delayed_cmd_id = cur_cmd_id
             delay = round(random.uniform(0.3, 1.2), 3)
             _log_actuation(sid, action, seq, {"type": "delay", "delay_s": delay})
         elif action == "plant_breadcrumb" and fs is not None:
             planted_path = str(data.get("planted_path") or "/home/admin/.aws/credentials")
             if not planted_path.startswith("/home/"):
                 planted_path = "/home/admin/.aws/credentials"
+            if fs.exists(planted_path):
+                suffix = str(seq) if seq is not None else "1"
+                candidate = f"{planted_path}.{suffix}"
+                idx = 1
+                while fs.exists(candidate):
+                    idx += 1
+                    candidate = f"{planted_path}.{suffix}.{idx}"
+                planted_path = candidate
             token_val = data.get("token_value") or "AKIAALDER7FAKE9TOKEN"
             token_id = data.get("token_id") or "ht-aws-key-04"
             token_kind = str(data.get("token_kind") or "api_key")
@@ -172,5 +215,6 @@ def consume_and_apply(shell):
             _log_actuation(sid, "maintain", seq, {"type": "baseline_maintained"})
 
         return delay
-    except Exception:
+    except Exception as err:
+        _log_error(err, sid)
         return 0.0

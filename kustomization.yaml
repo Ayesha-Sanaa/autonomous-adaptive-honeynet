@@ -42,6 +42,25 @@ configMapGenerator:
     namespace: honeynet
     files:
       - cmdoutput.json=decoys/cowrie/cmdoutput.json
+  - name: cowrie-honeypot
+    namespace: honeynet
+    files:
+      - honeypot.py=decoys/cowrie/honeypot.patched.py
+  - name: cowrie-actuation-hook
+    namespace: honeynet
+    files:
+      - actuation_hook.py=decoys/cowrie/actuation_hook.py
+  - name: cowrie-txtcmds
+    namespace: honeynet
+    files:
+      - df=decoys/cowrie/txtcmds/bin/df
+      - netstat=decoys/cowrie/txtcmds/bin/netstat
+      - systemctl=decoys/cowrie/txtcmds/bin/systemctl
+      - ip=decoys/cowrie/txtcmds/sbin/ip
+      - crontab=decoys/cowrie/txtcmds/usr/bin/crontab
+      - free=decoys/cowrie/txtcmds/usr/bin/free
+      - lscpu=decoys/cowrie/txtcmds/usr/bin/lscpu
+      - mysql=decoys/cowrie/txtcmds/usr/bin/mysql
   - name: honeytokens-json
     namespace: honeynet
     files:

@@ -33,7 +33,7 @@ spec:
           env:
             - name: COWRIE_SHELL_FILESYSTEM
               value: /fs/custom-fs.pickle
-            - name: COWRIE_SHELL_HOSTNAME
+            - name: COWRIE_HONEYPOT_HOSTNAME
               value: jump01
             - name: COWRIE_SHELL_KERNEL_VERSION
               value: 6.1.0-26-amd64
@@ -82,6 +82,46 @@ spec:
             - name: cmdoutput
               mountPath: /cowrie/cowrie-git/src/cowrie/data/cmdoutput.json
               subPath: cmdoutput.json
+              readOnly: true
+            - name: honeypot-py
+              mountPath: /cowrie/cowrie-git/src/cowrie/shell/honeypot.py
+              subPath: honeypot.py
+              readOnly: true
+            - name: actuation-hook
+              mountPath: /cowrie/cowrie-git/src/cowrie/shell/actuation_hook.py
+              subPath: actuation_hook.py
+              readOnly: true
+            - name: txtcmds
+              mountPath: /cowrie/cowrie-git/src/cowrie/data/txtcmds/usr/bin/df
+              subPath: df
+              readOnly: true
+            - name: txtcmds
+              mountPath: /cowrie/cowrie-git/src/cowrie/data/txtcmds/bin/netstat
+              subPath: netstat
+              readOnly: true
+            - name: txtcmds
+              mountPath: /cowrie/cowrie-git/src/cowrie/data/txtcmds/usr/bin/systemctl
+              subPath: systemctl
+              readOnly: true
+            - name: txtcmds
+              mountPath: /cowrie/cowrie-git/src/cowrie/data/txtcmds/usr/bin/ip
+              subPath: ip
+              readOnly: true
+            - name: txtcmds
+              mountPath: /cowrie/cowrie-git/src/cowrie/data/txtcmds/usr/bin/crontab
+              subPath: crontab
+              readOnly: true
+            - name: txtcmds
+              mountPath: /cowrie/cowrie-git/src/cowrie/data/txtcmds/usr/bin/free
+              subPath: free
+              readOnly: true
+            - name: txtcmds
+              mountPath: /cowrie/cowrie-git/src/cowrie/data/txtcmds/usr/bin/lscpu
+              subPath: lscpu
+              readOnly: true
+            - name: txtcmds
+              mountPath: /cowrie/cowrie-git/src/cowrie/data/txtcmds/usr/bin/mysql
+              subPath: mysql
               readOnly: true
         - name: actuator
           image: honeynet-backend:dev
@@ -193,6 +233,15 @@ spec:
         - name: cmdoutput
           configMap:
             name: cowrie-cmdoutput
+        - name: honeypot-py
+          configMap:
+            name: cowrie-honeypot
+        - name: actuation-hook
+          configMap:
+            name: cowrie-actuation-hook
+        - name: txtcmds
+          configMap:
+            name: cowrie-txtcmds
 ---
 apiVersion: v1
 kind: Service
