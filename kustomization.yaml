@@ -7,6 +7,7 @@ resources:
   - decoys/heralding/heralding.yaml
   - decoys/dionaea/dionaea.yaml
   - backend/deploy/mongodb.yaml
+  - backend/deploy/mongodb-backup-cronjob.yaml
   - backend/deploy/collector.yaml
   - backend/deploy/api.yaml
   - rl/deploy/sidecar.yaml
@@ -25,23 +26,46 @@ configMapGenerator:
     namespace: honeynet
     files:
      - decoys/web-portal/nginx/default.conf
-
   - name: dionaea-log-json
     namespace: honeynet
     files:
-     - decoys/dionaea/log_json.yaml   
-
+     - decoys/dionaea/log_json.yaml
   - name: cowrie-userdb
     namespace: honeynet
     files:
       - userdb.txt=decoys/cowrie/userdb.txt
-      
   - name: cowrie-fs-builder
     namespace: honeynet
     files:
-      - build-fs.py=decoys/cowrie/build-fs.py    
-
+      - build-fs.py=decoys/cowrie/build-fs.py
+  - name: cowrie-cmdoutput
+    namespace: honeynet
+    files:
+      - cmdoutput.json=decoys/cowrie/cmdoutput.json
+  - name: cowrie-honeypot
+    namespace: honeynet
+    files:
+      - honeypot.py=decoys/cowrie/honeypot.patched.py
+  - name: cowrie-actuation-hook
+    namespace: honeynet
+    files:
+      - actuation_hook.py=decoys/cowrie/actuation_hook.py
+  - name: cowrie-txtcmds
+    namespace: honeynet
+    files:
+      - df=decoys/cowrie/txtcmds/bin/df
+      - netstat=decoys/cowrie/txtcmds/bin/netstat
+      - systemctl=decoys/cowrie/txtcmds/bin/systemctl
+      - ip=decoys/cowrie/txtcmds/sbin/ip
+      - crontab=decoys/cowrie/txtcmds/usr/bin/crontab
+      - free=decoys/cowrie/txtcmds/usr/bin/free
+      - lscpu=decoys/cowrie/txtcmds/usr/bin/lscpu
+      - mysql=decoys/cowrie/txtcmds/usr/bin/mysql
+  - name: honeytokens-json
+    namespace: honeynet
+    files:
+      - honeytokens.json=decoys/honeytokens.json
   - name: haproxy-config
     namespace: honeynet
     files:
-      - haproxy/haproxy.cfg   
+      - haproxy/haproxy.cfg

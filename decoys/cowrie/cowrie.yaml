@@ -23,14 +23,53 @@ spec:
             - name: fs-builder
               mountPath: /scripts
               readOnly: true
+            - name: honeytokens
+              mountPath: /tokens/honeytokens.json
+              subPath: honeytokens.json
+              readOnly: true
       containers:
         - name: cowrie
           image: docker.io/cowrie/cowrie@sha256:115ed9b682dce64a112d6185dcd64c94969599e5b63f13c3e85927a9b2f0292f
           env:
             - name: COWRIE_SHELL_FILESYSTEM
               value: /fs/custom-fs.pickle
+            - name: COWRIE_HONEYPOT_HOSTNAME
+              value: jump01
+            - name: COWRIE_SHELL_KERNEL_VERSION
+              value: 6.1.0-26-amd64
+            - name: COWRIE_SHELL_KERNEL_BUILD_STRING
+              value: "#1 SMP PREEMPT_DYNAMIC Debian 6.1.112-1 (2024-09-30)"
+            - name: COWRIE_SHELL_HARDWARE_PLATFORM
+              value: x86_64
+            - name: COWRIE_SHELL_OPERATING_SYSTEM
+              value: GNU/Linux
+            - name: COWRIE_SSH_VERSION
+              value: "SSH-2.0-OpenSSH_9.2p1 Debian-2+deb12u3"
+            - name: ACTIONS_DIR
+              value: /actions
           ports:
             - containerPort: 2222
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests:
+              cpu: 100m
+              memory: 192Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          readinessProbe:
+            tcpSocket:
+              port: 2222
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: 2222
+            initialDelaySeconds: 15
+            periodSeconds: 20
           volumeMounts:
             - name: logs
               mountPath: /cowrie/cowrie-git/var/log/cowrie
@@ -44,6 +83,50 @@ spec:
             - name: actions
               mountPath: /actions
               readOnly: true
+            - name: cmdoutput
+              mountPath: /cowrie/cowrie-git/src/cowrie/data/cmdoutput.json
+              subPath: cmdoutput.json
+              readOnly: true
+            - name: honeypot-py
+              mountPath: /cowrie/cowrie-git/src/cowrie/shell/honeypot.py
+              subPath: honeypot.py
+              readOnly: true
+            - name: actuation-hook
+              mountPath: /cowrie/cowrie-git/src/cowrie/shell/actuation_hook.py
+              subPath: actuation_hook.py
+              readOnly: true
+            - name: txtcmds
+              mountPath: /cowrie/cowrie-git/src/cowrie/data/txtcmds/usr/bin/df
+              subPath: df
+              readOnly: true
+            - name: txtcmds
+              mountPath: /cowrie/cowrie-git/src/cowrie/data/txtcmds/bin/netstat
+              subPath: netstat
+              readOnly: true
+            - name: txtcmds
+              mountPath: /cowrie/cowrie-git/src/cowrie/data/txtcmds/usr/bin/systemctl
+              subPath: systemctl
+              readOnly: true
+            - name: txtcmds
+              mountPath: /cowrie/cowrie-git/src/cowrie/data/txtcmds/usr/bin/ip
+              subPath: ip
+              readOnly: true
+            - name: txtcmds
+              mountPath: /cowrie/cowrie-git/src/cowrie/data/txtcmds/usr/bin/crontab
+              subPath: crontab
+              readOnly: true
+            - name: txtcmds
+              mountPath: /cowrie/cowrie-git/src/cowrie/data/txtcmds/usr/bin/free
+              subPath: free
+              readOnly: true
+            - name: txtcmds
+              mountPath: /cowrie/cowrie-git/src/cowrie/data/txtcmds/usr/bin/lscpu
+              subPath: lscpu
+              readOnly: true
+            - name: txtcmds
+              mountPath: /cowrie/cowrie-git/src/cowrie/data/txtcmds/usr/bin/mysql
+              subPath: mysql
+              readOnly: true
         - name: actuator
           image: honeynet-backend:dev
           imagePullPolicy: Never
@@ -55,6 +138,11 @@ spec:
               value: /actions
           ports:
             - containerPort: 7100
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
           resources:
             requests:
               cpu: 20m
@@ -62,6 +150,12 @@ spec:
             limits:
               cpu: 100m
               memory: 128Mi
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 7100
+            initialDelaySeconds: 3
+            periodSeconds: 10
           volumeMounts:
             - name: actions
               mountPath: /actions
@@ -82,8 +176,21 @@ spec:
               value: cowrie
             - name: PEERS
               value: http://web-portal-crdt:7000,http://heralding-crdt:7000,http://dionaea-crdt:7000
+            - name: STATE_FILE
+              value: /crdt-state/cowrie.json
+            - name: CRDT_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: honeynet-secrets
+                  key: crdt-token
+                  optional: false
           ports:
             - containerPort: 7000
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
           resources:
             requests:
               cpu: 20m
@@ -91,10 +198,18 @@ spec:
             limits:
               cpu: 100m
               memory: 128Mi
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 7000
+            initialDelaySeconds: 3
+            periodSeconds: 10
           volumeMounts:
             - name: alllogs
               mountPath: /logs
               readOnly: true
+            - name: crdt-state
+              mountPath: /crdt-state
       volumes:
         - name: logs
           hostPath:
@@ -104,6 +219,10 @@ spec:
           hostPath:
             path: /logs
             type: Directory
+        - name: crdt-state
+          hostPath:
+            path: /logs/crdt-state
+            type: DirectoryOrCreate
         - name: userdb
           configMap:
             name: cowrie-userdb
@@ -114,6 +233,21 @@ spec:
         - name: fs-builder
           configMap:
             name: cowrie-fs-builder
+        - name: honeytokens
+          configMap:
+            name: honeytokens-json
+        - name: cmdoutput
+          configMap:
+            name: cowrie-cmdoutput
+        - name: honeypot-py
+          configMap:
+            name: cowrie-honeypot
+        - name: actuation-hook
+          configMap:
+            name: cowrie-actuation-hook
+        - name: txtcmds
+          configMap:
+            name: cowrie-txtcmds
 ---
 apiVersion: v1
 kind: Service

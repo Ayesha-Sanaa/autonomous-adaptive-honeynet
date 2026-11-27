@@ -17,9 +17,38 @@ spec:
         - name: backend
           image: docker.io/library/node@sha256:8996bb5821d62a8fd9bb27c1cb07462f3fdce6e47d640c6a881ead0b064ce216
           command: ["node", "/app/server.js"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests:
+              cpu: 30m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 192Mi
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 3000
+            initialDelaySeconds: 3
+            periodSeconds: 10
+            timeoutSeconds: 3
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 20
+            timeoutSeconds: 3
           volumeMounts:
             - name: code
               mountPath: /app
+              readOnly: true
+            - name: tokens
+              mountPath: /tokens
               readOnly: true
             - name: logs
               mountPath: /logs
@@ -27,6 +56,9 @@ spec:
         - name: code
           configMap:
             name: backend-code
+        - name: tokens
+          configMap:
+            name: honeytokens-json
         - name: logs
           hostPath:
             path: /logs/web-portal

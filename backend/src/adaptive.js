@@ -1,11 +1,12 @@
 /**
  * Adaptive Decision Controller.
- * Interacts with RL sidecar, enforces fallback, stores decisions in MongoDB,
- * and safely records adaptive actions (planting breadcrumbs, adjusting tier, passive observation).
+ * Interacts with RL sidecar (or experiment arm policy), enforces fallback & skill mask,
+ * stores decisions in MongoDB, and records decoy actions (verified separately by actuation log).
  */
 
 const http = require("http");
 const { extractSessionFeatures } = require("./features");
+const { applySkillMask } = require("./actor");
 
 const SIDECAR_URL = process.env.SIDECAR_URL || "http://localhost:5000";
 const ALLOWED_ACTIONS = ["maintain", "escalate_tier", "plant_breadcrumb", "observe_only"];
@@ -72,6 +73,20 @@ function fallbackDecision(reason) {
   };
 }
 
+// Arm B fixed rule matching simulator baseline
+function fixedRuleDecision(rawFeatures) {
+  if (rawFeatures[13] > 0 || rawFeatures[14] > 0) {
+    return { action: "escalate_tier", fallback: false, reason: "fixed_rule: download_or_evasion", model_version: "fixed-rule-1.0" };
+  }
+  if (rawFeatures[12] >= 2) {
+    return { action: "plant_breadcrumb", fallback: false, reason: "fixed_rule: recon_commands", model_version: "fixed-rule-1.0" };
+  }
+  if (rawFeatures[8] === 1 && rawFeatures[10] > 0) {
+    return { action: "observe_only", fallback: false, reason: "fixed_rule: post_login_watch", model_version: "fixed-rule-1.0" };
+  }
+  return { action: "maintain", fallback: false, reason: "fixed_rule: baseline", model_version: "fixed-rule-1.0" };
+}
+
 function getTopReasons(rawFeatures) {
   const reasons = [];
   if (rawFeatures[13] > 0) reasons.push(`${rawFeatures[13]} payload download attempts`);
@@ -92,7 +107,7 @@ function getTopReasons(rawFeatures) {
 
 async function applyDecoyAction(db, action, { src_ip, session, phase, seq }) {
   if (phase === "live" && !LIVE_ACTIONS_ENABLED) {
-    return { type: "live_actions_disabled", target_decoy: "cowrie", phase, seq: seq ?? null };
+    return { type: "live_actions_disabled", target_decoy: "cowrie", phase, seq: seq ?? null, verified: false };
   }
 
   const decoyStateCol = db.collection("decoy_state");
@@ -103,19 +118,21 @@ async function applyDecoyAction(db, action, { src_ip, session, phase, seq }) {
     details = {
       type: "fake_credential_planted",
       target_decoy: "cowrie",
-      fake_token: `AWS_SECRET_KEY=AKIA${Math.random().toString(36).substring(2, 10).toUpperCase()}`,
-      planted_path: "/home/root/.aws/credentials",
+      planted_path: "/home/admin/.aws/credentials",
+      verified: false,
     };
   } else if (action === "escalate_tier") {
     details = {
       type: "decoy_tier_escalated",
+      target_decoy: "cowrie",
       tier: "high_interaction",
-      unlocked_features: ["bash_history", "readable_etc_hosts"],
+      unlocked_features: ["bash_history_db01", "deploy_notes"],
+      verified: false,
     };
   } else if (action === "observe_only") {
-    details = { type: "passive_monitoring_mode", alerts_suppressed: false };
+    details = { type: "passive_monitoring_mode", target_decoy: "cowrie", alerts_suppressed: false, verified: false };
   } else {
-    details = { type: "baseline_maintained" };
+    details = { type: "baseline_maintained", target_decoy: "cowrie", verified: false };
   }
 
   await decoyStateCol.updateOne(
@@ -127,18 +144,30 @@ async function applyDecoyAction(db, action, { src_ip, session, phase, seq }) {
   return details;
 }
 
-async function evaluateAndDecide(db, { session, src_ip, phase = "final", seq = null, latency_ms = null }) {
+async function evaluateAndDecide(
+  db,
+  { session, src_ip, phase = "final", seq = null, latency_ms = null, skill_level = "high", arm = "C_ppo" }
+) {
   const decisionsCol = db.collection("adaptive_decisions");
   const featureData = await extractSessionFeatures(db, { session, src_ip });
 
-  const sidecarResponse = await callSidecar({
-    features: featureData.normalized,
-    session_id: session || "unknown",
-    src_ip: src_ip || featureData.src_ip || "unknown",
-  });
+  let sidecarResponse;
+  if (arm === "A_maintain") {
+    sidecarResponse = { action: "maintain", fallback: false, reason: "arm_A_maintain", model_version: "arm-A-maintain" };
+  } else if (arm === "B_fixed_rule") {
+    sidecarResponse = fixedRuleDecision(featureData.raw);
+  } else {
+    sidecarResponse = await callSidecar({
+      features: featureData.normalized,
+      session_id: session || "unknown",
+      src_ip: src_ip || featureData.src_ip || "unknown",
+    });
+  }
 
   const valid = ALLOWED_ACTIONS.includes(sidecarResponse.action);
-  const action = valid ? sidecarResponse.action : "maintain";
+  const rawAction = valid ? sidecarResponse.action : "maintain";
+  const maskedResult = phase === "live" ? applySkillMask(rawAction, skill_level) : { action: rawAction, masked: false };
+  const action = maskedResult.action;
   const actionId = ALLOWED_ACTIONS.indexOf(action);
   const appliedDetails = await applyDecoyAction(db, action, {
     session,
@@ -155,10 +184,14 @@ async function evaluateAndDecide(db, { session, src_ip, phase = "final", seq = n
     phase,
     seq,
     latency_ms,
+    arm,
+    skill_level,
+    skill_mask_applied: Boolean(maskedResult.masked),
+    raw_action: rawAction,
     action,
     action_id: actionId,
     fallback: !valid || sidecarResponse.fallback || false,
-    reason: valid ? sidecarResponse.reason || null : "invalid_action_from_sidecar",
+    reason: valid ? (sidecarResponse.reason || topReasons.join(", ")) : "invalid_action_from_sidecar",
     model_version: sidecarResponse.model_version || "ppo-v2.0",
     logits: sidecarResponse.logits || [],
     top_reasons: topReasons,

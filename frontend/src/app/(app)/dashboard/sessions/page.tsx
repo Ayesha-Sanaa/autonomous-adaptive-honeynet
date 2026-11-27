@@ -44,6 +44,7 @@ export default async function SessionsPage({
                   <th className="px-4 py-2 font-normal">Source IP</th>
                   <th className="px-4 py-2 font-normal">Duration</th>
                   <th className="px-4 py-2 font-normal">Status</th>
+                  <th className="px-4 py-2 font-normal">Actor / Skill</th>
                   <th className="px-4 py-2 font-normal">Commands</th>
                   <th className="px-4 py-2 font-normal">Start Time</th>
                 </tr>
@@ -76,6 +77,13 @@ export default async function SessionsPage({
                         </span>
                       ) : (
                         <span className="text-xs text-muted">Probing</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 font-mono text-xs">
+                      {s.actor ? (
+                        <span>{s.actor.actor_type.replace("_", " ")} ({s.actor.skill_level})</span>
+                      ) : (
+                        <span className="text-faint">-</span>
                       )}
                     </td>
                     <td className="px-4 py-3 tabular-nums">{formatNumber(s.commands.length)}</td>

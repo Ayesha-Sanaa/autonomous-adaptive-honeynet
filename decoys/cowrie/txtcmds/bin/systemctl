@@ -1,0 +1,11 @@
+● ssh.service - OpenBSD Secure Shell server
+     Loaded: loaded (/lib/systemd/system/ssh.service; enabled; preset: enabled)
+     Active: active (running) since Sun 2024-10-27 04:12:08 UTC; 3 weeks 1 days ago
+       Docs: man:sshd(8)
+             man:sshd_config(5)
+   Main PID: 519 (sshd)
+      Tasks: 1 (limit: 4680)
+     Memory: 4.8M
+        CPU: 1.420s
+     CGroup: /system.slice/ssh.service
+             └─519 "sshd: /usr/sbin/sshd -D [listener] 0 of 10-100 startups"

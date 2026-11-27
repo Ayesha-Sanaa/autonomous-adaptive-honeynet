@@ -18,6 +18,30 @@ spec:
           image: docker.io/library/nginx@sha256:b2f80f8f88146b0772fdcc7d92cea621aa8c2889fa8d07ed61d4884fcea53e09
           ports:
             - containerPort: 80
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+              add: ["NET_BIND_SERVICE", "CHOWN", "SETUID", "SETGID"]
+          resources:
+            requests:
+              cpu: 20m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 128Mi
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 3
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 10
+            periodSeconds: 20
           volumeMounts:
             - name: html
               mountPath: /usr/share/nginx/html
@@ -42,8 +66,21 @@ spec:
               value: web-portal
             - name: PEERS
               value: http://cowrie-crdt:7000,http://heralding-crdt:7000,http://dionaea-crdt:7000
+            - name: STATE_FILE
+              value: /crdt-state/web-portal.json
+            - name: CRDT_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: honeynet-secrets
+                  key: crdt-token
+                  optional: false
           ports:
             - containerPort: 7000
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
           resources:
             requests:
               cpu: 20m
@@ -51,10 +88,18 @@ spec:
             limits:
               cpu: 100m
               memory: 128Mi
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 7000
+            initialDelaySeconds: 3
+            periodSeconds: 10
           volumeMounts:
             - name: alllogs
               mountPath: /logs
               readOnly: true
+            - name: crdt-state
+              mountPath: /crdt-state
       volumes:
         - name: html
           configMap:
@@ -66,6 +111,10 @@ spec:
           hostPath:
             path: /logs
             type: Directory
+        - name: crdt-state
+          hostPath:
+            path: /logs/crdt-state
+            type: DirectoryOrCreate
 ---
 apiVersion: v1
 kind: Service

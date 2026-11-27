@@ -1,0 +1,50 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mongodb-backups
+  namespace: honeynet
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: mongodb-backup
+  namespace: honeynet
+spec:
+  schedule: "0 2 * * *"
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: mongodump
+              image: mongo:8.0-noble
+              env:
+                - name: MONGO_URL
+                  valueFrom:
+                    secretKeyRef:
+                      name: honeynet-secrets
+                      key: mongo-url
+                      optional: false
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  URI="${MONGO_URL:-mongodb://mongodb:27017/honeynet}"
+                  OUT="/backups/honeynet-$(date +%F-%H%M%S)"
+                  mongodump --uri="$URI" --out="$OUT" && \
+                  mongosh "$URI" --quiet --eval "db.ops_meta.updateOne({_id:'last_backup'},{\$set:{timestamp:new Date(),path:'$OUT'}},{upsert:true})"
+              volumeMounts:
+                - name: backups
+                  mountPath: /backups
+          volumes:
+            - name: backups
+              persistentVolumeClaim:
+                claimName: mongodb-backups

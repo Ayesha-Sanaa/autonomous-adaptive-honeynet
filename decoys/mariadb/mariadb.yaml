@@ -1,0 +1,108 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mariadb-init
+  namespace: honeynet
+data:
+  init.sql: |
+    CREATE DATABASE IF NOT EXISTS inventory;
+    USE inventory;
+    CREATE TABLE IF NOT EXISTS shipments (
+      id VARCHAR(16) PRIMARY KEY,
+      origin VARCHAR(64),
+      destination VARCHAR(64),
+      status VARCHAR(32)
+    );
+    INSERT IGNORE INTO shipments VALUES
+      ('AF-4012', 'Leeds Depot', 'Rotterdam Port', 'Dispatched'),
+      ('AF-4019', 'Manchester Hub', 'Antwerp', 'In Customs'),
+      ('AF-4025', 'Birmingham Yard', 'Felixstowe', 'Scheduled');
+    CREATE USER IF NOT EXISTS 'backup'@'%' IDENTIFIED BY 'B4ckup#Alder2024!';
+    GRANT SELECT ON inventory.* TO 'backup'@'%';
+    CREATE USER IF NOT EXISTS 'inventory_svc'@'%' IDENTIFIED BY 'InvSvc!94Alder';
+    GRANT SELECT ON inventory.* TO 'inventory_svc'@'%';
+    FLUSH PRIVILEGES;
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mariadb
+  namespace: honeynet
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mariadb
+  template:
+    metadata:
+      labels:
+        app: mariadb
+    spec:
+      containers:
+        - name: mariadb
+          image: mariadb:11.4
+          args:
+            - "--general_log=1"
+            - "--general_log_file=/var/log/mysql/general.log"
+          env:
+            - name: MARIADB_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: honeynet-secrets
+                  key: mariadb-root-password
+                  optional: true
+            - name: MARIADB_ALLOW_EMPTY_ROOT_PASSWORD
+              value: "no"
+            - name: MARIADB_RANDOM_ROOT_PASSWORD
+              value: "yes"
+          ports:
+            - containerPort: 3306
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 300m
+              memory: 384Mi
+          startupProbe:
+            tcpSocket:
+              port: 3306
+            periodSeconds: 5
+            failureThreshold: 30
+          readinessProbe:
+            tcpSocket:
+              port: 3306
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: 3306
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          volumeMounts:
+            - name: init
+              mountPath: /docker-entrypoint-initdb.d
+              readOnly: true
+            - name: logs
+              mountPath: /var/log/mysql
+      volumes:
+        - name: init
+          configMap:
+            name: mariadb-init
+        - name: logs
+          hostPath:
+            path: /logs/mariadb
+            type: DirectoryOrCreate
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mariadb
+  namespace: honeynet
+spec:
+  type: ClusterIP
+  selector:
+    app: mariadb
+  ports:
+    - port: 3306
+      targetPort: 3306

@@ -222,6 +222,8 @@ spec:
           port: 23
         - protocol: TCP
           port: 445
+        - protocol: TCP
+          port: 3306
     - to:
         - namespaceSelector:
             matchLabels:

@@ -45,6 +45,19 @@ export default async function SessionDetailPage({ params }: { params: Promise<{ 
         <StatCell label="Commands Captured" value={formatNumber(session.commands.length)} note={`${session.logins.length} login attempts`} />
       </div>
 
+      {session.actor && (
+        <Panel
+          title={`Actor Classification: ${session.actor.actor_type.replace("_", " ")} (${Math.round(session.actor.confidence * 100)}%)`}
+          hint={`Skill level: ${session.actor.skill_level}${session.arm ? ` · Arm: ${session.arm}` : ""} · heuristic`}
+        >
+          <ul className="list-disc pl-5 text-sm text-muted space-y-1">
+            {session.actor.reasons.map((r, i) => (
+              <li key={i}>{r}</li>
+            ))}
+          </ul>
+        </Panel>
+      )}
+
       <Panel title="Login Credentials Tried">
         {session.logins.length === 0 ? (
           <Empty title="No explicit login attempts recorded" />

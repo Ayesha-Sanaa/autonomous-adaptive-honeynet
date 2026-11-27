@@ -1,0 +1,989 @@
+>>             - name: fs-builder
+>>               mountPath: /scripts
+>>               readOnly: true
+>>             - name: honeytokens
+>>               mountPath: /tokens/honeytokens.json
+>>               subPath: honeytokens.json
+>>               readOnly: true
+>>       containers:
+>>         - name: cowrie
+>>           image: docker.io/cowrie/cowrie@sha256:115ed9b682dce64a112d6185dcd64c94969599e5b63f13c3e85927a9b2f0292f
+>>           env:
+>>             - name: COWRIE_SHELL_FILESYSTEM
+>>               value: /fs/custom-fs.pickle
+>>             - name: COWRIE_SHELL_HOSTNAME
+>>               value: jump01
+>>             - name: COWRIE_SHELL_KERNEL_VERSION
+>>               value: 6.1.0-26-amd64
+>>             - name: COWRIE_SHELL_KERNEL_BUILD_STRING
+>>               value: "#1 SMP PREEMPT_DYNAMIC Debian 6.1.112-1 (2024-09-30)"
+>>             - name: COWRIE_SHELL_HARDWARE_PLATFORM
+>>               value: x86_64
+>>             - name: COWRIE_SHELL_OPERATING_SYSTEM
+>>               value: GNU/Linux
+>>             - name: COWRIE_SSH_VERSION
+>>               value: "SSH-2.0-OpenSSH_9.2p1 Debian-2+deb12u3"
+>>             - name: ACTIONS_DIR
+>>               value: /actions
+>>           ports:
+>>             - containerPort: 2222
+>>           resources:
+>>             requests:
+>>               cpu: 100m
+>>               memory: 192Mi
+>>             limits:
+>>               cpu: 500m
+>>               memory: 512Mi
+>>           readinessProbe:
+>>             tcpSocket:
+>>               port: 2222
+>>             initialDelaySeconds: 5
+>>             periodSeconds: 10
+>>           livenessProbe:
+>>             tcpSocket:
+>>               port: 2222
+>>             initialDelaySeconds: 15
+>>             periodSeconds: 20
+>>           volumeMounts:
+>>             - name: logs
+>>               mountPath: /cowrie/cowrie-git/var/log/cowrie
+>>             - name: userdb
+>>               mountPath: /cowrie/cowrie-git/etc/userdb.txt
+>>               subPath: userdb.txt
+>>               readOnly: true
+>>             - name: fs
+>>               mountPath: /fs
+>>               readOnly: true
+>>             - name: actions
+>>               mountPath: /actions
+>>               readOnly: true
+>>             - name: cmdoutput
+>>               mountPath: /cowrie/cowrie-git/src/cowrie/data/cmdoutput.json
+>>               subPath: cmdoutput.json
+>>               readOnly: true
+>>         - name: actuator
+>>           image: honeynet-backend:dev
+>>           imagePullPolicy: Never
+>>           command: ["node", "/app/cowrie-actuator.js"]
+>>           env:
+>>             - name: ACTUATOR_PORT
+>>               value: "7100"
+>>             - name: ACTIONS_DIR
+>>               value: /actions
+>>           ports:
+>>             - containerPort: 7100
+>>           securityContext:
+>>             allowPrivilegeEscalation: false
+>>             capabilities:
+>>               drop: ["ALL"]
+>>           resources:
+>>             requests:
+>>               cpu: 20m
+>>               memory: 32Mi
+>>             limits:
+>>               cpu: 100m
+>>               memory: 128Mi
+>>           readinessProbe:
+>>             httpGet:
+>>               path: /health
+>>               port: 7100
+>>             initialDelaySeconds: 3
+>>             periodSeconds: 10
+>>           volumeMounts:
+>>             - name: actions
+>>               mountPath: /actions
+>>         - name: crdt
+>>           image: honeynet-backend:dev
+>>           imagePullPolicy: Never
+>>           command: ["node", "crdt-sidecar.js"]
+>>           env:
+>>             - name: DECOY_NAME
+>>               value: cowrie
+>>             - name: PORT
+>>               value: "7000"
+>>             - name: LOG_FILE
+>>               value: /logs/cowrie/cowrie.json
+>>             - name: LOG_FORMAT
+>>               value: jsonl
+>>             - name: NORMALIZER
+>>               value: cowrie
+>>             - name: PEERS
+>>               value: http://web-portal-crdt:7000,http://heralding-crdt:7000,http://dionaea-crdt:7000
+>>             - name: STATE_FILE
+>>               value: /crdt-state/cowrie.json
+>>             - name: CRDT_TOKEN
+>>               valueFrom:
+>>                 secretKeyRef:
+>>                   name: honeynet-secrets
+>>                   key: crdt-token
+>>                   optional: true
+>>           ports:
+>>             - containerPort: 7000
+>>           securityContext:
+>>             allowPrivilegeEscalation: false
+>>             capabilities:
+>>               drop: ["ALL"]
+>>           resources:
+>>             requests:
+>>               cpu: 20m
+>>               memory: 32Mi
+>>             limits:
+>>               cpu: 100m
+>>               memory: 128Mi
+>>           readinessProbe:
+>>             httpGet:
+>>               path: /health
+>>               port: 7000
+>>             initialDelaySeconds: 3
+>>             periodSeconds: 10
+>>           volumeMounts:
+>>             - name: alllogs
+>>               mountPath: /logs
+>>               readOnly: true
+>>             - name: crdt-state
+>>               mountPath: /crdt-state
+>>       volumes:
+>>         - name: logs
+>>           hostPath:
+>>             path: /logs/cowrie
+>>             type: Directory
+>>         - name: alllogs
+>>           hostPath:
+>>             path: /logs
+>>             type: Directory
+>>         - name: crdt-state
+>>           hostPath:
+>>             path: /logs/crdt-state
+>>             type: DirectoryOrCreate
+>>         - name: userdb
+>>           configMap:
+>>             name: cowrie-userdb
+>>         - name: fs
+>>           emptyDir: {}
+>>         - name: actions
+>>           emptyDir: {}
+>>         - name: fs-builder
+>>           configMap:
+>>             name: cowrie-fs-builder
+>>         - name: honeytokens
+>>           configMap:
+>>             name: honeytokens-json
+>>         - name: cmdoutput
+>>           configMap:
+>>             name: cowrie-cmdoutput
+>> ---
+>> apiVersion: v1
+>> kind: Service
+>> metadata:
+>>   name: cowrie
+>>   namespace: honeynet
+>> spec:
+>>   type: ClusterIP
+>>   selector:
+>>     app: cowrie
+>>   ports:
+>>     - port: 2222
+>>       targetPort: 2222
+>> ---
+>> api
+Oops, something went wrong.  Please report this bug with the details below.
+Report on GitHub: https://github.com/lzybkr/PSReadLine/issues/new
+-----------------------------------------------------------------------
+Last 200 Keys:
+ y Space a n d Space d e l e t e Space c o w r i e Space p o d s Enter
+ k u b e c t l Space a p p l y Space - k Space . Enter
+ k u b e c t l Space - n Space h o n e y n e t Space d e l e t e Space p o d s Space - l Space a p p = c o w r i e Enter
+ k u b e c t l Space - n Space h o n e y n e t Space d e l e t e Space p o d s Space - l Space a p p = h e r a l d i n g Enter
+ Enter
+ W r i t e - H o s t Space " C o w r i e Space Y A M L Space f u l l y Space c o r r e c t e d Space a n d Space p o d s Space r e s t a r t e d ! "
+
+Exception:
+System.ArgumentOutOfRangeException: The value must be greater than or equal to zero and less than the console's buffer size in that dimension.
+Parameter name: top
+Actual value was -193.
+   at System.Console.SetCursorPosition(Int32 left, Int32 top)
+   at Microsoft.PowerShell.PSConsoleReadLine.ReallyRender(RenderData renderData, String defaultColor)
+   at Microsoft.PowerShell.PSConsoleReadLine.ForceRender()
+   at Microsoft.PowerShell.PSConsoleReadLine.Insert(Char c)
+   at Microsoft.PowerShell.PSConsoleReadLine.SelfInsert(Nullable`1 key, Object arg)
+   at Microsoft.PowerShell.PSConsoleReadLine.ProcessOneKey(ConsoleKeyInfo key, Dictionary`2 dispatchTable, Boolean ignoreIfNoAction, Object arg)
+   at Microsoft.PowerShell.PSConsoleReadLine.InputLoop()
+   at Microsoft.PowerShell.PSConsoleReadLine.ReadLine(Runspace runspace, EngineIntrinsics engineIntrinsics)
+-----------------------------------------------------------------------
+PS C:\Users\s b\Downloads\autonomous-adaptive-honeynet> $cleanYaml = @"                                               
+>> apiVersion: apps/v1
+>> kind: Deployment
+>> metadata:
+>>   name: cowrie
+>>   namespace: honeynet
+>> spec:
+>>   replicas: 1
+>>   selector:
+>>     matchLabels:
+>>       app: cowrie
+>>   template:
+>>     metadata:
+>>       labels:
+>>         app: cowrie
+>>     spec:
+>>       initContainers:
+>>         - name: build-fs
+>>           image: docker.io/cowrie/cowrie@sha256:115ed9b682dce64a112d6185dcd64c94969599e5b63f13c3e85927a9b2f0292f
+>>           command: ["python3", "/scripts/build-fs.py"]
+>>           volumeMounts:
+>>             - name: fs
+>>               mountPath: /fs
+>>             - name: fs-builder
+>>               mountPath: /scripts
+>>               readOnly: true
+>>             - name: honeytokens
+>>               mountPath: /tokens/honeytokens.json
+>>               subPath: honeytokens.json
+>>               readOnly: true
+>>       containers:
+>>         - name: cowrie
+>>           image: docker.io/cowrie/cowrie@sha256:115ed9b682dce64a112d6185dcd64c94969599e5b63f13c3e85927a9b2f0292f
+>>           env:
+>>             - name: COWRIE_SHELL_FILESYSTEM
+>>               value: /fs/custom-fs.pickle
+>>             - name: COWRIE_SHELL_HOSTNAME
+>>               value: jump01
+>>             - name: COWRIE_SHELL_KERNEL_VERSION
+>>               value: 6.1.0-26-amd64
+>>             - name: COWRIE_SHELL_KERNEL_BUILD_STRING
+>>               value: "#1 SMP PREEMPT_DYNAMIC Debian 6.1.112-1 (2024-09-30)"
+>>             - name: COWRIE_SHELL_HARDWARE_PLATFORM
+>>               value: x86_64
+>>             - name: COWRIE_SHELL_OPERATING_SYSTEM
+>>               value: GNU/Linux
+>>             - name: COWRIE_SSH_VERSION
+>>               value: "SSH-2.0-OpenSSH_9.2p1 Debian-2+deb12u3"
+>>             - name: ACTIONS_DIR
+>>               value: /actions
+>>           ports:
+>>             - containerPort: 2222
+>>           resources:
+>>             requests:
+>>               cpu: 100m
+>>               memory: 192Mi
+>>             limits:
+>>               cpu: 500m
+>>               memory: 512Mi
+>>           readinessProbe:
+>>             tcpSocket:
+>>               port: 2222
+>>             initialDelaySeconds: 5
+>>             periodSeconds: 10
+>>           livenessProbe:
+>>             tcpSocket:
+>>               port: 2222
+>>             initialDelaySeconds: 15
+>>             periodSeconds: 20
+>>           volumeMounts:
+>>             - name: logs
+>>               mountPath: /cowrie/cowrie-git/var/log/cowrie
+>>             - name: userdb
+>>               mountPath: /cowrie/cowrie-git/etc/userdb.txt
+>>               subPath: userdb.txt
+>>               readOnly: true
+>>             - name: fs
+>>               mountPath: /fs
+>>               readOnly: true
+>>             - name: actions
+>>               mountPath: /actions
+>>               readOnly: true
+>>             - name: cmdoutput
+>>               mountPath: /cowrie/cowrie-git/src/cowrie/data/cmdoutput.json
+>>               subPath: cmdoutput.json
+>>               readOnly: true
+>>         - name: actuator
+>>           image: honeynet-backend:dev
+>>           imagePullPolicy: Never
+>>           command: ["node", "/app/cowrie-actuator.js"]
+>>           env:
+>>             - name: ACTUATOR_PORT
+>>               value: "7100"
+>>             - name: ACTIONS_DIR
+>>               value: /actions
+>>           ports:
+>>             - containerPort: 7100
+>>           securityContext:
+>>             allowPrivilegeEscalation: false
+>>             capabilities:
+>>               drop: ["ALL"]
+>>           resources:
+>>             requests:
+>>               cpu: 20m
+>>               memory: 32Mi
+>>             limits:
+>>               cpu: 100m
+>>               memory: 128Mi
+>>           readinessProbe:
+>>             httpGet:
+>>               path: /health
+>>               port: 7100
+>>             initialDelaySeconds: 3
+>>             periodSeconds: 10
+>>           volumeMounts:
+>>             - name: actions
+>>               mountPath: /actions
+>>         - name: crdt
+>>           image: honeynet-backend:dev
+>>           imagePullPolicy: Never
+>>           command: ["node", "crdt-sidecar.js"]
+>>           env:
+>>             - name: DECOY_NAME
+>>               value: cowrie
+>>             - name: PORT
+>>               value: "7000"
+>>             - name: LOG_FILE
+>>               value: /logs/cowrie/cowrie.json
+>>             - name: LOG_FORMAT
+>>               value: jsonl
+>>             - name: NORMALIZER
+>>               value: cowrie
+>>             - name: PEERS
+>>               value: http://web-portal-crdt:7000,http://heralding-crdt:7000,http://dionaea-crdt:7000
+>>             - name: STATE_FILE
+>>               value: /crdt-state/cowrie.json
+>>             - name: CRDT_TOKEN
+>>               valueFrom:
+>>                 secretKeyRef:
+>>                   name: honeynet-secrets
+>>                   key: crdt-token
+>>                   optional: true
+>>           ports:
+>>             - containerPort: 7000
+>>           securityContext:
+>>             allowPrivilegeEscalation: false
+>>             capabilities:
+>>               drop: ["ALL"]
+>>           resources:
+>>             requests:
+>>               cpu: 20m
+>>               memory: 32Mi
+>>             limits:
+>>               cpu: 100m
+>>               memory: 128Mi
+>>           readinessProbe:
+>>             httpGet:
+>>               path: /health
+>>               port: 7000
+>>             initialDelaySeconds: 3
+>>             periodSeconds: 10
+>>           volumeMounts:
+>>             - name: alllogs
+>>               mountPath: /logs
+>>               readOnly: true
+>>             - name: crdt-state
+>>               mountPath: /crdt-state
+>>       volumes:
+>>         - name: logs
+>>           hostPath:
+>>             path: /logs/cowrie
+>>             type: Directory
+>>         - name: alllogs
+>>           hostPath:
+>>             path: /logs
+>>             type: Directory
+>>         - name: crdt-state
+>>           hostPath:
+>>             path: /logs/crdt-state
+>>             type: DirectoryOrCreate
+>>         - name: userdb
+>>           configMap:
+>>             name: cowrie-userdb
+>>         - name: fs
+>>           emptyDir: {}
+>>         - name: actions
+>>           emptyDir: {}
+>>         - name: fs-builder
+>>           configMap:
+>>             name: cowrie-fs-builder
+>>         - name: honeytokens
+>>           configMap:
+>>             name: honeytokens-json
+>>         - name: cmdoutput
+>>           configMap:
+>>             name: cowrie-cmdoutput
+>> ---
+>> apiVersion: v1
+>> kind: Service
+>> metadata:
+>>   name: cowrie
+>>   namespace: honeynet
+>> spec:
+>>   type: ClusterIP
+>>   selector:
+>>     app: cowrie
+>>   ports:
+>>     - port: 2222
+>>       targetPort: 2222
+>> ---
+>> apiVersion: v1
+>> kind: Service
+>> metadata:
+>>   name: cowrie-actuator
+>>   name
+Oops, something went wrong.  Please report this bug with the details below.
+Report on GitHub: https://github.com/lzybkr/PSReadLine/issues/new
+-----------------------------------------------------------------------
+Last 200 Keys:
+ y Space a n d Space d e l e t e Space c o w r i e Space p o d s Enter
+ k u b e c t l Space a p p l y Space - k Space . Enter
+ k u b e c t l Space - n Space h o n e y n e t Space d e l e t e Space p o d s Space - l Space a p p = c o w r i e Enter
+ k u b e c t l Space - n Space h o n e y n e t Space d e l e t e Space p o d s Space - l Space a p p = h e r a l d i n g Enter
+ Enter
+ W r i t e - H o s t Space " C o w r i e Space Y A M L Space f u l l y Space c o r r e c t e d Space a n d Space p o d s Space r e s t a r t e d ! "
+
+Exception:
+System.ArgumentOutOfRangeException: The value must be greater than or equal to zero and less than the console's buffer size in that dimension.
+Parameter name: top
+Actual value was -197.
+   at System.Console.SetCursorPosition(Int32 left, Int32 top)
+   at Microsoft.PowerShell.PSConsoleReadLine.ReallyRender(RenderData renderData, String defaultColor)
+   at Microsoft.PowerShell.PSConsoleReadLine.ForceRender()
+   at Microsoft.PowerShell.PSConsoleReadLine.Insert(Char c)
+   at Microsoft.PowerShell.PSConsoleReadLine.SelfInsert(Nullable`1 key, Object arg)
+   at Microsoft.PowerShell.PSConsoleReadLine.ProcessOneKey(ConsoleKeyInfo key, Dictionary`2 dispatchTable, Boolean ignoreIfNoAction, Object arg)
+   at Microsoft.PowerShell.PSConsoleReadLine.InputLoop()
+   at Microsoft.PowerShell.PSConsoleReadLine.ReadLine(Runspace runspace, EngineIntrinsics engineIntrinsics)
+-----------------------------------------------------------------------
+PS C:\Users\s b\Downloads\autonomous-adaptive-honeynet> $cleanYaml = @"                                               
+>> apiVersion: apps/v1
+>> kind: Deployment
+>> metadata:
+>>   name: cowrie
+>>   namespace: honeynet
+>> spec:
+>>   replicas: 1
+>>   selector:
+>>     matchLabels:
+>>       app: cowrie
+>>   template:
+>>     metadata:
+>>       labels:
+>>         app: cowrie
+>>     spec:
+>>       initContainers:
+>>         - name: build-fs
+>>           image: docker.io/cowrie/cowrie@sha256:115ed9b682dce64a112d6185dcd64c94969599e5b63f13c3e85927a9b2f0292f
+>>           command: ["python3", "/scripts/build-fs.py"]
+>>           volumeMounts:
+>>             - name: fs
+>>               mountPath: /fs
+>>             - name: fs-builder
+>>               mountPath: /scripts
+>>               readOnly: true
+>>             - name: honeytokens
+>>               mountPath: /tokens/honeytokens.json
+>>               subPath: honeytokens.json
+>>               readOnly: true
+>>       containers:
+>>         - name: cowrie
+>>           image: docker.io/cowrie/cowrie@sha256:115ed9b682dce64a112d6185dcd64c94969599e5b63f13c3e85927a9b2f0292f
+>>           env:
+>>             - name: COWRIE_SHELL_FILESYSTEM
+>>               value: /fs/custom-fs.pickle
+>>             - name: COWRIE_SHELL_HOSTNAME
+>>               value: jump01
+>>             - name: COWRIE_SHELL_KERNEL_VERSION
+>>               value: 6.1.0-26-amd64
+>>             - name: COWRIE_SHELL_KERNEL_BUILD_STRING
+>>               value: "#1 SMP PREEMPT_DYNAMIC Debian 6.1.112-1 (2024-09-30)"
+>>             - name: COWRIE_SHELL_HARDWARE_PLATFORM
+>>               value: x86_64
+>>             - name: COWRIE_SHELL_OPERATING_SYSTEM
+>>               value: GNU/Linux
+>>             - name: COWRIE_SSH_VERSION
+>>               value: "SSH-2.0-OpenSSH_9.2p1 Debian-2+deb12u3"
+>>             - name: ACTIONS_DIR
+>>               value: /actions
+>>           ports:
+>>             - containerPort: 2222
+>>           resources:
+>>             requests:
+>>               cpu: 100m
+>>               memory: 192Mi
+>>             limits:
+>>               cpu: 500m
+>>               memory: 512Mi
+>>           readinessProbe:
+>>             tcpSocket:
+>>               port: 2222
+>>             initialDelaySeconds: 5
+>>             periodSeconds: 10
+>>           livenessProbe:
+>>             tcpSocket:
+>>               port: 2222
+>>             initialDelaySeconds: 15
+>>             periodSeconds: 20
+>>           volumeMounts:
+>>             - name: logs
+>>               mountPath: /cowrie/cowrie-git/var/log/cowrie
+>>             - name: userdb
+>>               mountPath: /cowrie/cowrie-git/etc/userdb.txt
+>>               subPath: userdb.txt
+>>               readOnly: true
+>>             - name: fs
+>>               mountPath: /fs
+>>               readOnly: true
+>>             - name: actions
+>>               mountPath: /actions
+>>               readOnly: true
+>>             - name: cmdoutput
+>>               mountPath: /cowrie/cowrie-git/src/cowrie/data/cmdoutput.json
+>>               subPath: cmdoutput.json
+>>               readOnly: true
+>>         - name: actuator
+>>           image: honeynet-backend:dev
+>>           imagePullPolicy: Never
+>>           command: ["node", "/app/cowrie-actuator.js"]
+>>           env:
+>>             - name: ACTUATOR_PORT
+>>               value: "7100"
+>>             - name: ACTIONS_DIR
+>>               value: /actions
+>>           ports:
+>>             - containerPort: 7100
+>>           securityContext:
+>>             allowPrivilegeEscalation: false
+>>             capabilities:
+>>               drop: ["ALL"]
+>>           resources:
+>>             requests:
+>>               cpu: 20m
+>>               memory: 32Mi
+>>             limits:
+>>               cpu: 100m
+>>               memory: 128Mi
+>>           readinessProbe:
+>>             httpGet:
+>>               path: /health
+>>               port: 7100
+>>             initialDelaySeconds: 3
+>>             periodSeconds: 10
+>>           volumeMounts:
+>>             - name: actions
+>>               mountPath: /actions
+>>         - name: crdt
+>>           image: honeynet-backend:dev
+>>           imagePullPolicy: Never
+>>           command: ["node", "crdt-sidecar.js"]
+>>           env:
+>>             - name: DECOY_NAME
+>>               value: cowrie
+>>             - name: PORT
+>>               value: "7000"
+>>             - name: LOG_FILE
+>>               value: /logs/cowrie/cowrie.json
+>>             - name: LOG_FORMAT
+>>               value: jsonl
+>>             - name: NORMALIZER
+>>               value: cowrie
+>>             - name: PEERS
+>>               value: http://web-portal-crdt:7000,http://heralding-crdt:7000,http://dionaea-crdt:7000
+>>             - name: STATE_FILE
+>>               value: /crdt-state/cowrie.json
+>>             - name: CRDT_TOKEN
+>>               valueFrom:
+>>                 secretKeyRef:
+>>                   name: honeynet-secrets
+>>                   key: crdt-token
+>>                   optional: true
+>>           ports:
+>>             - containerPort: 7000
+>>           securityContext:
+>>             allowPrivilegeEscalation: false
+>>             capabilities:
+>>               drop: ["ALL"]
+>>           resources:
+>>             requests:
+>>               cpu: 20m
+>>               memory: 32Mi
+>>             limits:
+>>               cpu: 100m
+>>               memory: 128Mi
+>>           readinessProbe:
+>>             httpGet:
+>>               path: /health
+>>               port: 7000
+>>             initialDelaySeconds: 3
+>>             periodSeconds: 10
+>>           volumeMounts:
+>>             - name: alllogs
+>>               mountPath: /logs
+>>               readOnly: true
+>>             - name: crdt-state
+>>               mountPath: /crdt-state
+>>       volumes:
+>>         - name: logs
+>>           hostPath:
+>>             path: /logs/cowrie
+>>             type: Directory
+>>         - name: alllogs
+>>           hostPath:
+>>             path: /logs
+>>             type: Directory
+>>         - name: crdt-state
+>>           hostPath:
+>>             path: /logs/crdt-state
+>>             type: DirectoryOrCreate
+>>         - name: userdb
+>>           configMap:
+>>             name: cowrie-userdb
+>>         - name: fs
+>>           emptyDir: {}
+>>         - name: actions
+>>           emptyDir: {}
+>>         - name: fs-builder
+>>           configMap:
+>>             name: cowrie-fs-builder
+>>         - name: honeytokens
+>>           configMap:
+>>             name: honeytokens-json
+>>         - name: cmdoutput
+>>           configMap:
+>>             name: cowrie-cmdoutput
+>> ---
+>> apiVersion: v1
+>> kind: Service
+>> metadata:
+>>   name: cowrie
+>>   namespace: honeynet
+>> spec:
+>>   type: ClusterIP
+>>   selector:
+>>     app: cowrie
+>>   ports:
+>>     - port: 2222
+>>       targetPort: 2222
+>> ---
+>> apiVersion: v1
+>> kind: Service
+>> metadata:
+>>   name: cowrie-actuator
+>>   namespace: honeynet
+>> spec:
+>>   type: ClusterIP
+>>   selector:
+>>     app: co
+Oops, something went wrong.  Please report this bug with the details below.
+Report on GitHub: https://github.com/lzybkr/PSReadLine/issues/new
+-----------------------------------------------------------------------
+Last 200 Keys:
+ y Space a n d Space d e l e t e Space c o w r i e Space p o d s Enter
+ k u b e c t l Space a p p l y Space - k Space . Enter
+ k u b e c t l Space - n Space h o n e y n e t Space d e l e t e Space p o d s Space - l Space a p p = c o w r i e Enter
+ k u b e c t l Space - n Space h o n e y n e t Space d e l e t e Space p o d s Space - l Space a p p = h e r a l d i n g Enter
+ Enter
+ W r i t e - H o s t Space " C o w r i e Space Y A M L Space f u l l y Space c o r r e c t e d Space a n d Space p o d s Space r e s t a r t e d ! "
+
+Exception:
+System.ArgumentOutOfRangeException: The value must be greater than or equal to zero and less than the console's buffer size in that dimension.
+Parameter name: top
+Actual value was -201.
+   at System.Console.SetCursorPosition(Int32 left, Int32 top)
+   at Microsoft.PowerShell.PSConsoleReadLine.ReallyRender(RenderData renderData, String defaultColor)
+   at Microsoft.PowerShell.PSConsoleReadLine.ForceRender()
+   at Microsoft.PowerShell.PSConsoleReadLine.AcceptLineImpl(Boolean validate)
+   at Microsoft.PowerShell.PSConsoleReadLine.ProcessOneKey(ConsoleKeyInfo key, Dictionary`2 dispatchTable, Boolean ignoreIfNoAction, Object arg)
+   at Microsoft.PowerShell.PSConsoleReadLine.InputLoop()
+   at Microsoft.PowerShell.PSConsoleReadLine.ReadLine(Runspace runspace, EngineIntrinsics engineIntrinsics)
+-----------------------------------------------------------------------
+PS C:\Users\s b\Downloads\autonomous-adaptive-honeynet> $cleanYaml = @"                                               
+>> apiVersion: apps/v1
+>> kind: Deployment
+>> metadata:
+>>   name: cowrie
+>>   namespace: honeynet
+>> spec:
+>>   replicas: 1
+>>   selector:
+>>     matchLabels:
+>>       app: cowrie
+>>   template:
+>>     metadata:
+>>       labels:
+>>         app: cowrie
+>>     spec:
+>>       initContainers:
+>>         - name: build-fs
+>>           image: docker.io/cowrie/cowrie@sha256:115ed9b682dce64a112d6185dcd64c94969599e5b63f13c3e85927a9b2f0292f
+>>           command: ["python3", "/scripts/build-fs.py"]
+>>           volumeMounts:
+>>             - name: fs
+>>               mountPath: /fs
+>>             - name: fs-builder
+>>               mountPath: /scripts
+>>               readOnly: true
+>>             - name: honeytokens
+>>               mountPath: /tokens/honeytokens.json
+>>               subPath: honeytokens.json
+>>               readOnly: true
+>>       containers:
+>>         - name: cowrie
+>>           image: docker.io/cowrie/cowrie@sha256:115ed9b682dce64a112d6185dcd64c94969599e5b63f13c3e85927a9b2f0292f
+>>           env:
+>>             - name: COWRIE_SHELL_FILESYSTEM
+>>               value: /fs/custom-fs.pickle
+>>             - name: COWRIE_SHELL_HOSTNAME
+>>               value: jump01
+>>             - name: COWRIE_SHELL_KERNEL_VERSION
+>>               value: 6.1.0-26-amd64
+>>             - name: COWRIE_SHELL_KERNEL_BUILD_STRING
+>>               value: "#1 SMP PREEMPT_DYNAMIC Debian 6.1.112-1 (2024-09-30)"
+>>             - name: COWRIE_SHELL_HARDWARE_PLATFORM
+>>               value: x86_64
+>>             - name: COWRIE_SHELL_OPERATING_SYSTEM
+>>               value: GNU/Linux
+>>             - name: COWRIE_SSH_VERSION
+>>               value: "SSH-2.0-OpenSSH_9.2p1 Debian-2+deb12u3"
+>>             - name: ACTIONS_DIR
+>>               value: /actions
+>>           ports:
+>>             - containerPort: 2222
+>>           resources:
+>>             requests:
+>>               cpu: 100m
+>>               memory: 192Mi
+>>             limits:
+>>               cpu: 500m
+>>               memory: 512Mi
+>>           readinessProbe:
+>>             tcpSocket:
+>>               port: 2222
+>>             initialDelaySeconds: 5
+>>             periodSeconds: 10
+>>           livenessProbe:
+>>             tcpSocket:
+>>               port: 2222
+>>             initialDelaySeconds: 15
+>>             periodSeconds: 20
+>>           volumeMounts:
+>>             - name: logs
+>>               mountPath: /cowrie/cowrie-git/var/log/cowrie
+>>             - name: userdb
+>>               mountPath: /cowrie/cowrie-git/etc/userdb.txt
+>>               subPath: userdb.txt
+>>               readOnly: true
+>>             - name: fs
+>>               mountPath: /fs
+>>               readOnly: true
+>>             - name: actions
+>>               mountPath: /actions
+>>               readOnly: true
+>>             - name: cmdoutput
+>>               mountPath: /cowrie/cowrie-git/src/cowrie/data/cmdoutput.json
+>>               subPath: cmdoutput.json
+>>               readOnly: true
+>>         - name: actuator
+>>           image: honeynet-backend:dev
+>>           imagePullPolicy: Never
+>>           command: ["node", "/app/cowrie-actuator.js"]
+>>           env:
+>>             - name: ACTUATOR_PORT
+>>               value: "7100"
+>>             - name: ACTIONS_DIR
+>>               value: /actions
+>>           ports:
+>>             - containerPort: 7100
+>>           securityContext:
+>>             allowPrivilegeEscalation: false
+>>             capabilities:
+>>               drop: ["ALL"]
+>>           resources:
+>>             requests:
+>>               cpu: 20m
+>>               memory: 32Mi
+>>             limits:
+>>               cpu: 100m
+>>               memory: 128Mi
+>>           readinessProbe:
+>>             httpGet:
+>>               path: /health
+>>               port: 7100
+>>             initialDelaySeconds: 3
+>>             periodSeconds: 10
+>>           volumeMounts:
+>>             - name: actions
+>>               mountPath: /actions
+>>         - name: crdt
+>>           image: honeynet-backend:dev
+>>           imagePullPolicy: Never
+>>           command: ["node", "crdt-sidecar.js"]
+>>           env:
+>>             - name: DECOY_NAME
+>>               value: cowrie
+>>             - name: PORT
+>>               value: "7000"
+>>             - name: LOG_FILE
+>>               value: /logs/cowrie/cowrie.json
+>>             - name: LOG_FORMAT
+>>               value: jsonl
+>>             - name: NORMALIZER
+>>               value: cowrie
+>>             - name: PEERS
+>>               value: http://web-portal-crdt:7000,http://heralding-crdt:7000,http://dionaea-crdt:7000
+>>             - name: STATE_FILE
+>>               value: /crdt-state/cowrie.json
+>>             - name: CRDT_TOKEN
+>>               valueFrom:
+>>                 secretKeyRef:
+>>                   name: honeynet-secrets
+>>                   key: crdt-token
+>>                   optional: true
+>>           ports:
+>>             - containerPort: 7000
+>>           securityContext:
+>>             allowPrivilegeEscalation: false
+>>             capabilities:
+>>               drop: ["ALL"]
+>>           resources:
+>>             requests:
+>>               cpu: 20m
+>>               memory: 32Mi
+>>             limits:
+>>               cpu: 100m
+>>               memory: 128Mi
+>>           readinessProbe:
+>>             httpGet:
+>>               path: /health
+>>               port: 7000
+>>             initialDelaySeconds: 3
+>>             periodSeconds: 10
+>>           volumeMounts:
+>>             - name: alllogs
+>>               mountPath: /logs
+>>               readOnly: true
+>>             - name: crdt-state
+>>               mountPath: /crdt-state
+>>       volumes:
+>>         - name: logs
+>>           hostPath:
+>>             path: /logs/cowrie
+>>             type: Directory
+>>         - name: alllogs
+>>           hostPath:
+>>             path: /logs
+>>             type: Directory
+>>         - name: crdt-state
+>>           hostPath:
+>>             path: /logs/crdt-state
+>>             type: DirectoryOrCreate
+>>         - name: userdb
+>>           configMap:
+>>             name: cowrie-userdb
+>>         - name: fs
+>>           emptyDir: {}
+>>         - name: actions
+>>           emptyDir: {}
+>>         - name: fs-builder
+>>           configMap:
+>>             name: cowrie-fs-builder
+>>         - name: honeytokens
+>>           configMap:
+>>             name: honeytokens-json
+>>         - name: cmdoutput
+>>           configMap:
+>>             name: cowrie-cmdoutput
+>> ---
+>> apiVersion: v1
+>> kind: Service
+>> metadata:
+>>   name: cowrie
+>>   namespace: honeynet
+>> spec:
+>>   type: ClusterIP
+>>   selector:
+>>     app: cowrie
+>> metadata:
+>>   name: cowrie-actuator
+>>   namespace: honeynet
+>>   ports:
+>>     - name: http
+>>       port: 7100
+>>       targetPort: 7100
+>> "@
+PS C:\Users\s b\Downloads\autonomous-adaptive-honeynet> Set-Content $yamlPath $cleanYaml -Encoding utf8
+PS C:\Users\s b\Downloads\autonomous-adaptive-honeynet> 
+PS C:\Users\s b\Downloads\autonomous-adaptive-honeynet> # Also ensure build-fs.py checks /tokens/honeytokens.json
+PS C:\Users\s b\Downloads\autonomous-adaptive-honeynet> $pyPath = "decoys\cowrie\build-fs.py"
+PS C:\Users\s b\Downloads\autonomous-adaptive-honeynet> $pyContent = Get-Content $pyPath -Raw
+PS C:\Users\s b\Downloads\autonomous-adaptive-honeynet> if ($pyContent -notmatch '/tokens/honeytokens\.json') {
+>>     $pyContent = $pyContent -replace '("/scripts/honeytokens\.json",)', '"/tokens/honeytokens.json", $1'
+>>     Set-Content $pyPath $pyContent -Encoding utf8
+>> }
+PS C:\Users\s b\Downloads\autonomous-adaptive-honeynet> 
+PS C:\Users\s b\Downloads\autonomous-adaptive-honeynet> # Apply and delete cowrie pods
+PS C:\Users\s b\Downloads\autonomous-adaptive-honeynet> kubectl apply -k .
+namespace/honeynet unchanged
+configmap/backend-code-mhm8b88t2d unchanged
+configmap/cowrie-cmdoutput-kbm9dd5t85 unchanged
+configmap/cowrie-fs-builder-td8tb4hfd4 unchanged
+configmap/cowrie-userdb-bt6ch277gt unchanged
+configmap/dionaea-log-json-b7t8ckm5t2 unchanged
+configmap/haproxy-config-2bmf8m9dk2 unchanged
+configmap/honeytokens-json-8m26b6d862 unchanged
+configmap/mariadb-init unchanged
+configmap/nginx-conf-44k9tkb226 unchanged
+configmap/portal-html-f52hb94ht8 unchanged
+service/api unchanged
+service/backend unchanged
+service/cowrie unchanged
+service/cowrie-actuator unchanged
+service/cowrie-crdt unchanged
+service/dionaea unchanged
+service/dionaea-crdt unchanged
+service/haproxy unchanged
+service/heralding unchanged
+service/heralding-crdt unchanged
+service/mariadb unchanged
+service/mongodb unchanged
+service/rl-sidecar unchanged
+service/web-portal unchanged
+service/web-portal-crdt unchanged
+persistentvolumeclaim/mongodb-backups unchanged
+persistentvolumeclaim/mongodb-data unchanged
+deployment.apps/api unchanged
+deployment.apps/backend unchanged
+deployment.apps/collector unchanged
+deployment.apps/cowrie configured
+deployment.apps/dionaea unchanged
+deployment.apps/haproxy unchanged
+deployment.apps/heralding unchanged
+deployment.apps/mongodb unchanged
+deployment.apps/rl-sidecar unchanged
+cronjob.batch/mongodb-backup unchanged
+networkpolicy.networking.k8s.io/allow-collector-to-cowrie-actuator unchanged
+networkpolicy.networking.k8s.io/allow-haproxy-to-heralding unchanged
+networkpolicy.networking.k8s.io/allow-web-portal-to-backend unchanged
+networkpolicy.networking.k8s.io/crdt-sync unchanged
+networkpolicy.networking.k8s.io/decoys-default-deny unchanged
+networkpolicy.networking.k8s.io/decoys-dns unchanged
+networkpolicy.networking.k8s.io/haproxy-egress unchanged
+networkpolicy.networking.k8s.io/mariadb-isolation unchanged
+networkpolicy.networking.k8s.io/web-portal-egress-to-backend unchanged
+PS C:\Users\s b\Downloads\autonomous-adaptive-honeynet> kubectl -n honeynet delete pods -l app=cowrie
+pod "cowrie-5b766d448d-t879t" deleted from honeynet namespace
+pod "cowrie-85c59556d9-54n5r" deleted from honeynet namespace
+PS C:\Users\s b\Downloads\autonomous-adaptive-honeynet> kubectl -n honeynet delete pods -l app=heralding
+pod "heralding-779fc7fdc-2jvgj" deleted from honeynet namespace
+pod "heralding-7b9bb9c8c4-p5llg" deleted from honeynet namespace
+PS C:\Users\s b\Downloads\autonomous-adaptive-honeynet> 
+PS C:\Users\s b\Downloads\autonomous-adaptive-honeynet> Write-Host "Cowrie YAML fully corrected and pods restarted!"
+Cowrie YAML fully corrected and pods restarted!
+PS C:\Users\s b\Downloads\autonomous-adaptive-honeynet> kubectl -n honeynet get pods -o wide
+NAME                          READY   STATUS    RESTARTS      AGE   IP            NODE                     NOMINATED NODE   READINESS GATES
+api-754b9d4474-j57th          1/1     Running   0             54m   10.244.0.30   honeynet-control-plane   <none>           <none>
+backend-8c558b6f9-ljnm5       1/1     Running   1 (59m ago)   81m   10.244.0.15   honeynet-control-plane   <none>           <none>
+collector-7c447c7bcd-9dd7x    1/1     Running   0             54m   10.244.0.29   honeynet-control-plane   <none>           <none>
+cowrie-85c59556d9-zrdvt       3/3     Running   0             93s   10.244.0.50   honeynet-control-plane   <none>           <none>
+dionaea-b69bcb74d-mz68c       2/2     Running   0             81m   10.244.0.19   honeynet-control-plane   <none>           <none>
+haproxy-86b7cdf6b5-pq2gj      1/1     Running   0             81m   10.244.0.20   honeynet-control-plane   <none>           <none>
+heralding-779fc7fdc-f7z6p     1/2     Running   0             76s   10.244.0.51   honeynet-control-plane   <none>           <none>
+heralding-7b9bb9c8c4-fmb4r    1/2     Running   0             75s   10.244.0.52   honeynet-control-plane   <none>           <none>
+mariadb-6876c44cc7-t9sm9      1/1     Running   0             80m   10.244.0.21   honeynet-control-plane   <none>           <none>
+mongodb-6cc9cf8b94-h22kh      1/1     Running   0             80m   10.244.0.26   honeynet-control-plane   <none>           <none>
+rl-sidecar-78f5947cf9-8xtgt   1/1     Running   0             54m   10.244.0.31   honeynet-control-plane   <none>           <none>
+web-portal-5c44ccbccb-2hz8l   2/2     Running   1 (58m ago)   80m   10.244.0.23   honeynet-control-plane   <none>           <none>

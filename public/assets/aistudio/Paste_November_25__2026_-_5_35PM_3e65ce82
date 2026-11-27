@@ -1,0 +1,353 @@
+PS C:\Users\s b\Downloads\autonomous-adaptive-honeynet> New-Item -ItemType Directory backups -Force | Out-Null
+PS C:\Users\s b\Downloads\autonomous-adaptive-honeynet> Add-Content .gitignore "`nbackups/"
+PS C:\Users\s b\Downloads\autonomous-adaptive-honeynet> kubectl -n honeynet exec deployment/mongodb -- mongodump --db 
+honeynet --archive=/tmp/pre-silver.archive
+2026-11-25T12:23:46.565+0000    writing `honeynet.decoy_state` to "archive `/tmp/pre-silver.archive`"
+2026-11-25T12:23:46.578+0000    writing `honeynet.adaptive_decisions` to "archive `/tmp/pre-silver.archive`"
+2026-11-25T12:23:46.639+0000    writing `honeynet.users` to "archive `/tmp/pre-silver.archive`"
+2026-11-25T12:23:46.662+0000    done dumping `honeynet.events` (287 documents)
+2026-11-25T12:23:46.662+0000    writing `honeynet.signup_requests` to "archive `/tmp/pre-silver.archive`"
+2026-11-25T12:23:46.691+0000    done dumping `honeynet.decoy_state` (18 documents)
+2026-11-25T12:23:46.691+0000    writing `honeynet.audit` to "archive `/tmp/pre-silver.archive`"
+2026-11-25T12:23:46.758+0000    done dumping `honeynet.signup_requests` (0 documents)
+2026-11-25T12:23:47.073+0000    done dumping `honeynet.adaptive_decisions` (20 documents)
+2026-11-25T12:23:47.974+0000    done dumping `honeynet.users` (1 document)
+2026-11-25T12:23:48.168+0000    done dumping `honeynet.sessions` (0 documents){.items[0].metadata.name}')
+PS C:\Users\s b\Downloads\autonomous-adaptive-honeynet> kubectl -n honeynet cp "${m}:/tmp/pre-silver.archive" backups/
+tar: Removing leading `/' from member names
+PS C:\Users\s b\Downloads\autonomous-adaptive-honeynet> Get-Item backups\pre-silver.archive | Select-Object Length
+Length
+159556
+
+
+PS C:\Users\s b\Downloads\autonomous-adaptive-honeynet> git checkout -b s1-live-decisions
+Switched to a new branch 's1-live-decisions'
+PS C:\Users\s b\Downloads\autonomous-adaptive-honeynet> git add -A
+PS C:\Users\s b\Downloads\autonomous-adaptive-honeynet> git commit -m "S1: live decisions during the session (tested on one session, fixes pending)"
+[s1-live-decisions f8b55f9] S1: live decisions during the session (tested on one session, fixes pending)
+ 1 file changed, 2 insertions(+)
+PS C:\Users\s b\Downloads\autonomous-adaptive-honeynet> git --no-pager log --oneline -2
+f8b55f9 (HEAD -> s1-live-decisions) S1: live decisions during the session (tested on one session, fixes pending)
+1a9080d (origin/main, main) depth
+PS C:\Users\s b\Downloads\autonomous-adaptive-honeynet> git branch --show-current
+s1-live-decisions
+PS C:\Users\s b\Downloads\autonomous-adaptive-honeynet> git status --short | Measure-Object | Select-Object Count
+
+-----
+
+
+    Directory: C:\Users\s b\Downloads\autonomous-adaptive-honeynet\backups
+
+Mode                 LastWriteTime         Length Name                                                               
+-a----        11/25/2026   5:23 PM         159556 pre-silver.archive                                                 
+PS C:\Users\s b\Downloads\autonomous-adaptive-honeynet> if (-not (Test-Path backups\pre-silver.archive)) { throw "STOP
+s1-live-decisions }
+PS C:\Users\s b\Downloads\autonomous-adaptive-honeynet> git add -A                                                    
+On branch s1-live-decisions                                                                                           
+PS C:\Users\s b\Downloads\autonomous-adaptive-honeynet> git branch --show-current
+s1-live-decisions
+PS C:\Users\s b\Downloads\autonomous-adaptive-honeynet> 
+PS C:\Users\s b\Downloads\autonomous-adaptive-honeynet> $zip = Get-ChildItem "$env:USERPROFILE\Downloads\autonomous-adaptive-honeynet*.zip" | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+PS C:\Users\s b\Downloads\autonomous-adaptive-honeynet> $zip.Name
+autonomous-adaptive-honeynet.zip
+PS C:\Users\s b\Downloads\autonomous-adaptive-honeynet> $dest = "$env:USERPROFILE\Downloads\aistudio-silver"
+PS C:\Users\s b\Downloads\autonomous-adaptive-honeynet> if (Test-Path $dest) { Remove-Item $dest -Recurse -Force }
+PS C:\Users\s b\Downloads\autonomous-adaptive-honeynet> Expand-Archive $zip.FullName -DestinationPath $dest -Force
+PS C:\Users\s b\Downloads\autonomous-adaptive-honeynet> $src = $dest
+PS C:\Users\s b\Downloads\autonomous-adaptive-honeynet> if (-not (Test-Path "$src\backend")) { $inner = Get-ChildItem $dest -Directory | Where-Object { Test-Path "$($_.FullName)\backend" } | Select-Object -First 1; if ($inner) { $src = 
+$inner.FullName } }
+PS C:\Users\s b\Downloads\autonomous-adaptive-honeynet> Write-Host "Source folder: $src"
+Source folder: C:\Users\s b\Downloads\aistudio-silver
+PS C:\Users\s b\Downloads\autonomous-adaptive-honeynet> Get-ChildItem $src | Select-Object Name
+
+Name               
+----               
+analysis           
+attackers          
+backend            
+decoys             
+docs               
+frontend           
+haproxy            
+logs               
+.dockerignore      
+.env.example       
+DECISION_NOTE_S2.md
+dev.js             
+docker-compose.yml 
+kustomization.yaml 
+package.json       
+README.md          
+up.cmd             
+
+
+PS C:\Users\s b\Downloads\autonomous-adaptive-honeynet> Remove-Item "$src\dev.js","$src\docker-compose.yml","$src\package.json","$src\.env.example" -ErrorAction SilentlyContinue
+PS C:\Users\s b\Downloads\autonomous-adaptive-honeynet> Remove-Item "$src\logs" -Recurse -Force -ErrorAction SilentlyContinue
+PS C:\Users\s b\Downloads\autonomous-adaptive-honeynet> git checkout -b silver-draft
+Switched to a new branch 'silver-draft'
+
+
+------------------------------------------------------------------------------
+
+               Total    Copied   Skipped  Mismatch    FAILED    Extras
+    Dirs :        53        10        43         0         0         9
+   Files :       155       155         0         0         0         5
+   Bytes :    1.77 m    1.77 m         0         0         0     2.0 k
+   Times :   0:00:01   0:00:01                       0:00:00   0:00:00
+
+
+   Speed :             1821469 Bytes/sec.
+   Speed :             104.225 MegaBytes/min.
+   Ended : Wednesday, November 25, 2026 5:33:07 PM
+
+PS C:\Users\s b\Downloads\autonomous-adaptive-honeynet> Add-Content .gitignore "`nbackups/`nrl/seed_models/"
+PS C:\Users\s b\Downloads\autonomous-adaptive-honeynet> git add -A
+warning: in the working copy of '.dockerignore', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '.gitignore', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/deploy/api.yaml', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/deploy/collector.yaml', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/deploy/mongodb.yaml', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/package-lock.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/package.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/src/adaptive.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/src/analytics.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/src/api.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/src/auth.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/src/collector.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/src/cowrie-actuator.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/src/crdt-sidecar.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/src/crdt.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/src/crdt.test.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/src/create-user.js', LF will be replaced by CRLF the next time Git touches itwarning: in the working copy of 'backend/src/features.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/src/mitre.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/src/normalize.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/src/normalizers/cowrie.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/src/normalizers/dionaea.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/src/normalizers/heralding.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/src/normalizers/web-portal.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/src/records.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/src/seed.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/src/test-attack.js', LF will be replaced by CRLF the next time Git touches itwarning: in the working copy of 'decoys/STORY.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'decoys/cowrie/build-fs.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'decoys/cowrie/cowrie.yaml', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'decoys/cowrie/userdb.txt', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'decoys/crdt-services.yaml', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'decoys/dionaea/dionaea.yaml', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'decoys/dionaea/log_json.yaml', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'decoys/heralding/heralding.yaml', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'decoys/web-portal/capture.yaml', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'decoys/web-portal/capture/server.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'decoys/web-portal/nginx/default.conf', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'decoys/web-portal/site/index.html', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'decoys/web-portal/web-portal.yaml', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/.gitignore', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/next.config.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/package-lock.json', LF will be replaced by CRLF the next time Git touches itwarning: in the working copy of 'frontend/package.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/postcss.config.mjs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/src/app/(app)/dashboard/adaptive/page.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/src/app/(app)/dashboard/attackers/[ip]/page.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/src/app/(app)/dashboard/attackers/page.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/src/app/(app)/dashboard/crdt/crdt-graph.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/src/app/(app)/dashboard/crdt/page.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/src/app/(app)/dashboard/decoys/page.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/src/app/(app)/dashboard/error.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/src/app/(app)/dashboard/events/live-feed.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/src/app/(app)/dashboard/events/page.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/src/app/(app)/dashboard/loading.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/src/app/(app)/dashboard/mitre/page.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/src/app/(app)/dashboard/page.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/src/app/(app)/dashboard/reports/actions.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/src/app/(app)/dashboard/reports/page.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/src/app/(app)/dashboard/reports/report-form.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/src/app/(app)/dashboard/sessions/[id]/page.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/src/app/(app)/dashboard/sessions/page.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/src/app/(app)/dashboard/settings/actions.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/src/app/(app)/dashboard/settings/page.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/src/app/(app)/dashboard/settings/password-form.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/src/app/(app)/layout.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/src/app/about/page.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/src/app/actions.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/src/app/api/stream/route.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/src/app/globals.css', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/src/app/layout.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/src/app/login/hex-field.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/src/app/login/login-form.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/src/app/login/login.css', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/src/app/login/page.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/src/app/login/trap-field.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/src/app/not-found.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/src/app/page.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/src/app/signup/page.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/src/app/signup/signup-form.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/src/components/attack-matrix.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/src/components/auto-refresh.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/src/components/confirm-submit.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/src/components/day-bars.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/src/components/demo-banner.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/src/components/donut.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/src/components/insights.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/src/components/logo.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/src/components/sidebar.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/src/components/ui.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/src/lib/api.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/src/lib/format.ts', LF will be replaced by CRLF the next time Git touches itwarning: in the working copy of 'frontend/src/lib/session.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/src/lib/types.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/tsconfig.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'haproxy/haproxy.cfg', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'haproxy/haproxy.yaml', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'k8s/kind-config.yaml', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'k8s/namespace.yaml', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'k8s/network-policies.yaml', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'kustomization.yaml', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'rl/arms.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'rl/arms_results.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'rl/deploy/sidecar.yaml', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'rl/env.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'rl/env_v1.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'rl/evaluate.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'rl/evaluation.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'rl/evaluation_v1.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'rl/export_onnx.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'rl/features.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'rl/multi_seed.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'rl/multi_seed_results.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'rl/reward_breakdown.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'rl/reward_breakdown.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'rl/sidecar/server.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'rl/test_env.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'rl/train.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tools/fix_decisions.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'up.cmd', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'DECISION_NOTE_S2.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'analysis/PREREG.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'analysis/experiment_report.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'attackers/profiles.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'attackers/run_experiment.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/deploy/mongodb-backup-cronjob.yaml', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/src/actor.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/src/honeytokens.js', LF will be replaced by CRLF the next time Git touches itwarning: in the working copy of 'backend/src/normalizers/cowrie-actuation.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/src/normalizers/mariadb.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'decoys/cowrie/actuation_hook.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'decoys/cowrie/cmdoutput.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'decoys/cowrie/txtcmds/bin/df', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'decoys/cowrie/txtcmds/bin/netstat', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'decoys/cowrie/txtcmds/bin/systemctl', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'decoys/cowrie/txtcmds/sbin/ip', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'decoys/cowrie/txtcmds/usr/bin/crontab', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'decoys/cowrie/txtcmds/usr/bin/free', LF will be replaced by CRLF the next time Git to
+warning: in the working copy of 'decoys/cowrie/txtcmds/usr/bin/lscpu', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'decoys/cowrie/txtcmds/usr/bin/mysql', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'decoys/honeytokens.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'decoys/mariadb/mariadb.yaml', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'docs/SILVER_RUNBOOK.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/src/app/(app)/dashboard/ops/page.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'k8s/secrets.example.yaml', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tools/command_coverage.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tools/honeypot_checks.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tools/patch_cowrie_honeypot.py', LF will be replaced by CRLF the next time Git touches it
+PS C:\Users\s b\Downloads\autonomous-adaptive-honeynet> git commit -m "AI Studio Silver draft (not tested on the cluster)"
+[silver-draft 605e261] AI Studio Silver draft (not tested on the cluster)
+ 72 files changed, 3096 insertions(+), 194 deletions(-)
+ create mode 100644 DECISION_NOTE_S2.md
+ create mode 100644 analysis/PREREG.md
+ create mode 100644 analysis/experiment_report.py
+ create mode 100644 attackers/profiles.py
+ create mode 100644 attackers/run_experiment.py
+ create mode 100644 backend/deploy/mongodb-backup-cronjob.yaml
+ create mode 100644 backend/src/actor.js
+ create mode 100644 backend/src/honeytokens.js
+ create mode 100644 backend/src/normalizers/cowrie-actuation.js
+ create mode 100644 backend/src/normalizers/mariadb.js
+ create mode 100644 decoys/cowrie/actuation_hook.py
+ create mode 100644 decoys/cowrie/cmdoutput.json
+ create mode 100644 decoys/cowrie/txtcmds/bin/netstat
+ create mode 100644 decoys/cowrie/txtcmds/bin/systemctl
+ create mode 100644 decoys/cowrie/txtcmds/sbin/ip
+ create mode 100644 decoys/cowrie/txtcmds/usr/bin/crontab
+ create mode 100644 decoys/cowrie/txtcmds/usr/bin/free
+ create mode 100644 decoys/cowrie/txtcmds/usr/bin/lscpu
+ create mode 100644 decoys/cowrie/txtcmds/usr/bin/mysql
+ create mode 100644 decoys/honeytokens.json
+ create mode 100644 decoys/mariadb/mariadb.yaml
+ create mode 100644 docs/SILVER_RUNBOOK.md
+ create mode 100644 frontend/src/app/(app)/dashboard/ops/page.tsx
+ create mode 100644 k8s/secrets.example.yaml
+ create mode 100644 tools/command_coverage.py
+ create mode 100644 tools/honeypot_checks.py
+ create mode 100644 tools/patch_cowrie_honeypot.py
+PS C:\Users\s b\Downloads\autonomous-adaptive-honeynet> git --no-pager diff --stat s1-live-decisions silver-draft | Select-Object -Last 90
+ .gitignore                                         |   1 +
+ DECISION_NOTE_S2.md                                |  26 ++
+ analysis/PREREG.md                                 |  32 ++
+ analysis/experiment_report.py                      | 184 +++++++++++
+ attackers/profiles.py                              | 117 +++++++
+ attackers/run_experiment.py                        |  73 +++++
+ backend/deploy/api.yaml                            |  36 ++-
+ backend/deploy/collector.yaml                      |  28 +-
+ backend/deploy/mongodb-backup-cronjob.yaml         |  50 +++
+ backend/deploy/mongodb.yaml                        |  17 +
+ backend/src/actor.js                               | 157 +++++++++
+ backend/src/adaptive.js                            |  65 +++-
+ backend/src/analytics.js                           |   2 +-
+ backend/src/api.js                                 | 124 +++++++-
+ backend/src/auth.js                                |  20 +-
+ backend/src/collector.js                           | 185 ++++++++++-
+ backend/src/cowrie-actuator.js                     |  32 +-
+ backend/src/crdt-sidecar.js                        |  52 ++-
+ backend/src/honeytokens.js                         |  60 ++++
+ backend/src/mitre.js                               |   7 +
+ backend/src/normalizers/cowrie-actuation.js        |  23 ++
+ backend/src/normalizers/cowrie.js                  |   6 +-
+ backend/src/normalizers/mariadb.js                 |  70 ++++
+ backend/src/normalizers/web-portal.js              |  12 +-
+ backend/src/test-attack.js                         |   2 +-
+ decoys/cowrie/actuation_hook.py                    | 158 +++++++++
+ decoys/cowrie/build-fs.py                          | 125 ++++++--
+ decoys/cowrie/cmdoutput.json                       |  10 +
+ decoys/cowrie/cowrie.yaml                          |  79 +++++
+ decoys/cowrie/txtcmds/bin/df                       |   7 +
+ decoys/cowrie/txtcmds/bin/netstat                  |   5 +
+ decoys/cowrie/txtcmds/bin/systemctl                |  11 +
+ decoys/cowrie/txtcmds/sbin/ip                      |   8 +
+ decoys/cowrie/txtcmds/usr/bin/crontab              |   1 +
+ decoys/cowrie/txtcmds/usr/bin/free                 |   3 +
+ decoys/cowrie/txtcmds/usr/bin/lscpu                |  19 ++
+ decoys/cowrie/txtcmds/usr/bin/mysql                |   1 +
+ decoys/dionaea/dionaea.yaml                        |  41 +++
+ decoys/heralding/heralding.yaml                    |  41 +++
+ decoys/honeytokens.json                            |  59 ++++
+ decoys/mariadb/mariadb.yaml                        | 103 ++++++
+ decoys/web-portal/capture.yaml                     |  29 ++
+ decoys/web-portal/capture/server.js                | 354 ++++++++++++++++++++-
+ decoys/web-portal/nginx/default.conf               |   6 +-
+ decoys/web-portal/site/index.html                  |  17 +-
+ decoys/web-portal/web-portal.yaml                  |  43 +++
+ docs/SILVER_RUNBOOK.md                             |  73 +++++
+ frontend/package-lock.json                         | 100 +++---
+ frontend/src/app/(app)/dashboard/adaptive/page.tsx |  22 +-
+ .../app/(app)/dashboard/attackers/[ip]/page.tsx    |  35 +-
+ frontend/src/app/(app)/dashboard/ops/page.tsx      |  96 ++++++
+ frontend/src/app/(app)/dashboard/page.tsx          |  45 ++-
+ .../src/app/(app)/dashboard/sessions/[id]/page.tsx |  13 +
+ frontend/src/app/(app)/dashboard/sessions/page.tsx |   8 +
+ frontend/src/app/(app)/layout.tsx                  |   2 +-
+ frontend/src/app/actions.ts                        |   2 +-
+ frontend/src/components/demo-banner.tsx            |   2 +-
+ frontend/src/components/sidebar.tsx                |   3 +-
+ frontend/src/lib/types.ts                          |  37 +++
+ haproxy/haproxy.yaml                               |  17 +
+ k8s/network-policies.yaml                          |  23 +-
+ k8s/secrets.example.yaml                           |  16 +
+ kustomization.yaml                                 |  20 +-
+ rl/deploy/sidecar.yaml                             |  12 +-
+ rl/evaluate.py                                     |   2 +-
+ rl/export_onnx.py                                  |   2 +-
+ rl/features.json                                   |   2 +-
+ rl/test_env.py                                     |   2 +-
+ rl/train.py                                        |   2 +-
+ tools/command_coverage.py                          |  99 ++++++
+ tools/honeypot_checks.py                           | 103 ++++++
+ tools/patch_cowrie_honeypot.py                     |  51 +++
+ 72 files changed, 3096 insertions(+), 194 deletions(-)
+PS C:\Users\s b\Downloads\autonomous-adaptive-honeynet> 

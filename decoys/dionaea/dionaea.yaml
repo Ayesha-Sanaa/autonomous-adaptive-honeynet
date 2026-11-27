@@ -21,6 +21,28 @@ spec:
               value: "1"
           ports:
             - containerPort: 445
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+              add: ["NET_BIND_SERVICE", "SETUID", "SETGID", "CHOWN", "DAC_OVERRIDE"]
+          resources:
+            requests:
+              cpu: 50m
+              memory: 96Mi
+            limits:
+              cpu: 300m
+              memory: 384Mi
+          readinessProbe:
+            tcpSocket:
+              port: 445
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: 445
+            initialDelaySeconds: 15
+            periodSeconds: 20
           volumeMounts:
             - name: log-json
               mountPath: /opt/dionaea/etc/dionaea/ihandlers-enabled/log_json.yaml
@@ -44,8 +66,21 @@ spec:
               value: dionaea
             - name: PEERS
               value: http://cowrie-crdt:7000,http://web-portal-crdt:7000,http://heralding-crdt:7000
+            - name: STATE_FILE
+              value: /crdt-state/dionaea.json
+            - name: CRDT_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: honeynet-secrets
+                  key: crdt-token
+                  optional: false
           ports:
             - containerPort: 7000
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
           resources:
             requests:
               cpu: 20m
@@ -53,10 +88,18 @@ spec:
             limits:
               cpu: 100m
               memory: 128Mi
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 7000
+            initialDelaySeconds: 3
+            periodSeconds: 10
           volumeMounts:
             - name: alllogs
               mountPath: /logs
               readOnly: true
+            - name: crdt-state
+              mountPath: /crdt-state
       volumes:
         - name: log-json
           configMap:
@@ -73,6 +116,10 @@ spec:
           hostPath:
             path: /logs
             type: Directory
+        - name: crdt-state
+          hostPath:
+            path: /logs/crdt-state
+            type: DirectoryOrCreate
 ---
 apiVersion: v1
 kind: Service

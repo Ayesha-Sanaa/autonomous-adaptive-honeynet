@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { WarningCircle } from "@phosphor-icons/react/dist/ssr";
 import { api } from "@/lib/api";
-import type { Attacker, Counted, EventRow, Session, Stats } from "@/lib/types";
+import type { Attacker, Counted, EventRow, HoneytokensResponse, Session, Stats } from "@/lib/types";
 import { fillDays, formatDay, formatNumber, formatTime, isPrivateIp, relativeTime, visible } from "@/lib/format";
 import { AutoRefresh } from "@/components/auto-refresh";
 import { AttackMatrix, tacticLabel } from "@/components/attack-matrix";
@@ -100,6 +100,7 @@ export default async function OverviewPage({
   const recent = events.slice(0, 12);
   let adaptive: AdaptiveStats | null = null;
   let crdt: CrdtSummary | null = null;
+  let honeytokens: HoneytokensResponse | null = null;
   try {
     adaptive = await api<AdaptiveStats>("/adaptive/stats");
   } catch {
@@ -109,6 +110,11 @@ export default async function OverviewPage({
     crdt = await api<CrdtSummary>("/crdt");
   } catch {
     crdt = null;
+  }
+  try {
+    honeytokens = await api<HoneytokensResponse>("/honeytokens");
+  } catch {
+    honeytokens = null;
   }
   const techniques = new Map<string, { id: string; name: string; tactics: string[]; count: number }>();
   const bump = (t: { id: string; name: string; tactics: string[] }, by: number) => {
@@ -248,6 +254,43 @@ export default async function OverviewPage({
           )}
         </Panel>
       </div>
+
+      <Panel title="Honeytokens" hint="fake decoy credentials &amp; leak attribution" flush>
+        {honeytokens === null ? (
+          <p className="px-4 py-4 text-sm text-muted">Honeytoken data is not available right now.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[640px] text-left text-sm">
+              <thead className="border-b border-line text-xs text-faint">
+                <tr>
+                  <th className="px-4 py-2 font-normal">Token ID</th>
+                  <th className="px-4 py-2 font-normal">Username</th>
+                  <th className="px-4 py-2 font-normal">Planted in</th>
+                  <th className="px-4 py-2 font-normal">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-line">
+                {honeytokens.tokens.map((t) => (
+                  <tr key={t.id} className="smooth hover:bg-surface-2">
+                    <td className="px-4 py-2.5 font-mono text-xs">{t.id}</td>
+                    <td className="px-4 py-2.5 font-mono text-xs">{t.username || "-"}</td>
+                    <td className="px-4 py-2.5 font-mono text-xs text-muted">{t.planted_in}</td>
+                    <td className="px-4 py-2.5 text-xs">
+                      {t.hit ? (
+                        <span className="rounded border border-danger/40 bg-danger/10 px-2 py-0.5 font-medium text-danger">
+                          HIT ({t.hit_count})
+                        </span>
+                      ) : (
+                        <span className="text-faint">not hit</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Panel>
       <div className="grid gap-6 xl:grid-cols-3">
         <Panel title="Events per day" hint={`${formatDay(days[0].day)} to ${formatDay(days[days.length - 1].day)}`} className="xl:col-span-2">
                   <form method="get" className="mb-4 flex flex-wrap items-end gap-3 text-sm">
