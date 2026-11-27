@@ -1,6 +1,5 @@
 const http = require("http");
 const { MongoClient } = require("mongodb");
-const { MemoryMongoClient, seedMemoryDb } = require("./memory-db");
 const { attackersPipeline, sessionsPipeline, shapeAttacker, shapeSession } = require("./analytics");
 const auth = require("./auth");
 const { CrdtState } = require("./crdt");
